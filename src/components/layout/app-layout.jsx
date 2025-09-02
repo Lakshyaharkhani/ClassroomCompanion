@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -42,12 +41,12 @@ export default function AppLayout({ user, onLogout, onNav, children }) {
         </aside>
         {mobileNavOpen && (
           <div className="fixed inset-0 top-14 z-20 bg-background/80 backdrop-blur-sm md:hidden" onClick={() => setMobileNavOpen(false)}>
-            <div className="fixed inset-0 z-40 w-5/6 max-w-sm bg-background">
+            <div className="fixed inset-y-0 left-0 z-40 w-1/2 max-w-sm bg-background">
                <SidebarNav items={navItems} onLinkClick={handleLinkClick} />
             </div>
           </div>
         )}
-        <main className="container flex w-full flex-col overflow-hidden py-6 max-w-6xl">
+        <main className="container flex w-full flex-col overflow-hidden py-6 px-4 sm:px-6 max-w-6xl">
           {children}
         </main>
       </div>

@@ -258,9 +258,18 @@ export default function StudentDashboard({ user }) {
         <CardContent>
             <Tabs defaultValue="personal">
                 <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="personal">Personal Details</TabsTrigger>
-                    <TabsTrigger value="contact">Contact Details</TabsTrigger>
-                    <TabsTrigger value="academics">Academic Details</TabsTrigger>
+                    <TabsTrigger value="personal">
+                        <span className="sm:hidden">Personal</span>
+                        <span className="hidden sm:inline">Personal Details</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="contact">
+                        <span className="sm:hidden">Contact</span>
+                        <span className="hidden sm:inline">Contact Details</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="academics">
+                        <span className="sm:hidden">Academics</span>
+                        <span className="hidden sm:inline">Academic Details</span>
+                    </TabsTrigger>
                 </TabsList>
                 <TabsContent value="personal" className="mt-4">
                     <DetailRow label="Name" value={user.name} />
@@ -294,3 +303,4 @@ export default function StudentDashboard({ user }) {
     </div>
   );
 }
+
