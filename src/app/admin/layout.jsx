@@ -3,7 +3,7 @@
 
 import { useAuth } from "../../components/auth/auth-provider";
 import AppLayout from "../../components/layout/app-layout";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import AppSkeleton from "../../components/layout/app-skeleton";
 
