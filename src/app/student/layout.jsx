@@ -8,12 +8,12 @@ import { useEffect } from "react";
 import AppSkeleton from "../../components/layout/app-skeleton";
 
 
-export default function StudentLayout({ children }) {
+export default function AdminLayout({ children }) {
     const { user, loading, logout } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
-        if (!loading && (!user || user.role !== 'student')) {
+        if (!loading && !user) {
             router.replace('/');
         }
     }, [user, loading, router]);
