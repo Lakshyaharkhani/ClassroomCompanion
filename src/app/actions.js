@@ -3,7 +3,7 @@
 
 import { db } from "../lib/firebase";
 import { collection, writeBatch, doc, setDoc } from "firebase/firestore";
-import { seedStudents, seedStaff, seedAdmin, seedClasses } from "../lib/data.js";
+import { seedStudents, seedStaff, seedAdmin, seedClasses, uid } from "../lib/data.js";
 import { getAuth } from "firebase-admin/auth";
 import { initializeAdminApp } from "../lib/firebase-admin";
 
@@ -60,6 +60,52 @@ export async function createAdminUser(userData) {
         return { success: false, message: message };
     }
 }
+
+export async function createStaffUser(formData) {
+    try {
+        const app = await initializeAdminApp();
+        const auth = getAuth(app);
+
+        // 1. Create user in Firebase Authentication
+        await auth.createUser({
+            email: formData.email,
+            password: formData.password,
+            displayName: formData.staffName,
+            disabled: false,
+        });
+
+        // 2. Create user document in Firestore
+        const newStaff = {
+            staff_id: `STF-${uid().substring(0,3).toUpperCase()}`,
+            name: formData.staffName,
+            email: formData.email,
+            role: 'staff',
+            department: formData.department,
+            designation: formData.designation,
+            phone: formData.phone,
+            joining_date: formData.joiningDate,
+            qualification: formData.qualification,
+            gender: formData.gender,
+            dob: formData.dob,
+            details: { ...formData }, // Store all form fields in a details object
+        };
+
+        const docId = formData.email.replace(/[^a-zA-Z0-9]/g, "");
+        await setDoc(doc(db, "users", docId), newStaff);
+        
+        return { success: true, message: `Staff user ${formData.staffName} created successfully.`, newUser: {id: docId, ...newStaff} };
+    } catch(error) {
+        console.error("Error creating staff user:", error);
+        let message = "An unexpected error occurred while creating the staff user.";
+        if (error.code === 'auth/email-already-exists') {
+            message = "This email address is already in use by another account.";
+        } else if (error.code === 'auth/invalid-password') {
+            message = "The password is not strong enough. It must be at least 6 characters long.";
+        }
+        return { success: false, message: message };
+    }
+}
+
 
 export async function seedDatabase() {
     try {

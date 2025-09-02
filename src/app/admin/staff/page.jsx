@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { db } from "../../../lib/firebase";
-import { collection, getDocs, doc, setDoc, deleteDoc, query, where } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, deleteDoc, query, where, updateDoc } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { PlusCircle, Edit, Trash2 } from "lucide-react";
@@ -17,12 +17,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { ScrollArea } from "../../../components/ui/scroll-area";
 import { useToast } from "../../../hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../../../components/ui/alert-dialog";
+import { createStaffUser } from "../../actions";
 
 
 function AddStaffDialog({ onStaffAdded }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({});
+  const [password, setPassword] = useState("password123");
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
@@ -34,35 +36,19 @@ function AddStaffDialog({ onStaffAdded }) {
   }
 
   const handleSubmit = async () => {
-    const staffId = `STF-${uid()}`;
-    const newStaff = {
-      // Top-level fields for easy access and querying
-      staff_id: staffId,
-      name: formData.staffName || 'N/A',
-      email: formData.email || '',
-      role: 'staff',
-      department: formData.department || '',
-      designation: formData.designation || '',
-      phone: formData.phone || '',
-      joining_date: formData.joiningDate || '',
-      assigned_classes: [],
-      
-      // A `details` object for all other information from the form
-      details: {
-          ...formData,
-      },
-    };
-    
-    try {
-        const docId = formData.email.replace(/[^a-zA-Z0-9]/g, "");
-        await setDoc(doc(db, "users", docId), newStaff);
-        onStaffAdded({ ...newStaff, id: docId });
-        toast({ title: "Success", description: "New staff member has been added." });
+    if (!formData.email || !password) {
+        toast({ variant: "destructive", title: "Error", description: "Email and password are required." });
+        return;
+    }
+    const result = await createStaffUser({ ...formData, password });
+    if (result.success) {
+        onStaffAdded(result.newUser);
+        toast({ title: "Success", description: result.message });
         setOpen(false);
-        setFormData({}); // Reset form
-    } catch (error) {
-        console.error("Error adding staff: ", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not add staff member." });
+        setFormData({});
+        setPassword("password123");
+    } else {
+        toast({ variant: "destructive", title: "Error", description: result.message });
     }
   };
 
@@ -123,7 +109,7 @@ function AddStaffDialog({ onStaffAdded }) {
         <DialogHeader>
           <DialogTitle>Add New Staff Member</DialogTitle>
           <DialogDescription>
-            Fill in the details for the new staff member. Click save when you're done.
+            Fill in the details for the new staff member. An account will be created in Firebase Authentication with the specified password.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="h-[50vh] pr-6">
@@ -152,9 +138,158 @@ function AddStaffDialog({ onStaffAdded }) {
                 </Card>
             </TabsContent>
             </Tabs>
+             <div className="p-4 space-y-2 border-t mt-4">
+                <Label htmlFor="password">Set Password</Label>
+                <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+                <p className="text-xs text-muted-foreground">Set an initial password for the new staff member.</p>
+            </div>
         </ScrollArea>
         <DialogFooter>
           <Button type="submit" onClick={handleSubmit}>Save New Staff</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditStaffDialog({ staffToEdit, onStaffUpdated, children }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [formData, setFormData] = useState({});
+
+  useEffect(() => {
+    // This combines the top-level fields and the `details` object into one flat object for the form
+    const initialData = {
+      ...(staffToEdit.details || {}),
+      staffName: staffToEdit.name,
+      email: staffToEdit.email,
+      department: staffToEdit.department,
+      designation: staffToEdit.designation,
+      phone: staffToEdit.phone,
+      joiningDate: staffToEdit.joining_date,
+      qualification: staffToEdit.qualification,
+      gender: staffToEdit.gender,
+      dob: staffToEdit.dob,
+    };
+    setFormData(initialData);
+  }, [staffToEdit]);
+
+
+  const handleInputChange = (e) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+  const handleSelectChange = (id, value) => {
+    setFormData(prev => ({ ...prev, [id]: value }));
+  }
+
+  const handleSubmit = async () => {
+    // Reconstruct the object to be saved in Firestore
+    const updatedStaffData = {
+      ...staffToEdit,
+      name: formData.staffName,
+      email: formData.email, // Note: email is not editable to maintain consistency with Firebase Auth
+      department: formData.department,
+      designation: formData.designation,
+      phone: formData.phone,
+      joining_date: formData.joiningDate,
+      qualification: formData.qualification,
+      gender: formData.gender,
+      dob: formData.dob,
+      details: {
+        ...formData,
+      },
+    };
+
+    try {
+      const staffRef = doc(db, "users", staffToEdit.id);
+      await updateDoc(staffRef, updatedStaffData);
+      onStaffUpdated(updatedStaffData);
+      toast({ title: "Success", description: "Staff details have been updated." });
+      setOpen(false);
+    } catch (error) {
+      console.error("Error updating staff: ", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not update staff details." });
+    }
+  };
+
+  const renderFields = (fields, data) => {
+    return fields.map(field => (
+        <div className="grid grid-cols-4 items-center gap-4" key={field.id}>
+            <Label htmlFor={field.id} className="text-right text-sm">
+                {field.label}
+            </Label>
+            {field.type === 'select' ? (
+                 <Select onValueChange={(value) => handleSelectChange(field.id, value)} value={data[field.id] || ''}>
+                    <SelectTrigger className="col-span-3 h-8">
+                        <SelectValue placeholder={field.placeholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {field.options.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            ) : (
+                <Input id={field.id} type={field.type || 'text'} value={data[field.id] || ''} onChange={handleInputChange} className="col-span-3 h-8" placeholder={field.placeholder} disabled={field.disabled} />
+            )}
+        </div>
+    ));
+  }
+
+  const personalFields = [
+      { id: 'title', label: 'Title', type: 'select', options: ['Dr.', 'Prof.', 'Mr.', 'Ms.'] },
+      { id: 'staffName', label: 'Full Name', placeholder: 'e.g., Dr. Ian Malcolm' },
+      { id: 'gender', label: 'Gender', type: 'select', options: ['Male', 'Female', 'Other'] },
+      { id: 'dob', label: 'Date of Birth', type: 'date' },
+      { id: 'email', label: 'Email', type: 'email', disabled: true },
+      { id: 'phone', label: 'Phone Number', placeholder: 'e.g., 123-456-7890' },
+  ];
+
+  const professionalFields = [
+      { id: 'department', label: 'Department', placeholder: 'e.g., Mathematics' },
+      { id: 'designation', label: 'Designation', placeholder: 'e.g., Head of Department' },
+      { id: 'joiningDate', label: 'Date of Joining', type: 'date' },
+      { id: 'qualification', label: 'Highest Qualification', placeholder: 'e.g., Ph.D. in Mathematics' },
+  ];
+
+  const contactFields = [
+      { id: 'address', label: 'Permanent Address' },
+      { id: 'city', label: 'City' },
+      { id: 'state', label: 'State' },
+      { id: 'pincode', label: 'Pincode' },
+  ];
+
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Edit Staff: {staffToEdit.name}</DialogTitle>
+          <DialogDescription>
+            Update the staff member's details. The email address cannot be changed.
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="h-[50vh] pr-6">
+          <Tabs defaultValue="personal" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="personal">Personal</TabsTrigger>
+              <TabsTrigger value="professional">Professional</TabsTrigger>
+              <TabsTrigger value="contact">Contact</TabsTrigger>
+            </TabsList>
+            <TabsContent value="personal">
+              <Card><CardHeader><CardTitle>Personal Information</CardTitle></CardHeader><CardContent className="space-y-4">{renderFields(personalFields, formData)}</CardContent></Card>
+            </TabsContent>
+            <TabsContent value="professional">
+              <Card><CardHeader><CardTitle>Professional Information</CardTitle></CardHeader><CardContent className="space-y-4">{renderFields(professionalFields, formData)}</CardContent></Card>
+            </TabsContent>
+            <TabsContent value="contact">
+              <Card><CardHeader><CardTitle>Contact Information</CardTitle></CardHeader><CardContent className="space-y-4">{renderFields(contactFields, formData)}</CardContent></Card>
+            </TabsContent>
+          </Tabs>
+        </ScrollArea>
+        <DialogFooter>
+          <Button type="submit" onClick={handleSubmit}>Save Changes</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -187,6 +322,11 @@ export default function StaffManagementPage() {
 
   const handleAddStaff = (newStaff) => {
     setStaff([...staff, newStaff]);
+  };
+
+  const handleUpdateStaff = (updatedStaff) => {
+    const updatedList = staff.map(s => s.id === updatedStaff.id ? updatedStaff : s);
+    setStaff(updatedList);
   };
 
   const handleDeleteStaff = async (staffDocId) => {
@@ -239,9 +379,11 @@ export default function StaffManagementPage() {
                   <TableCell>{s.department}</TableCell>
                   <TableCell>{s.assigned_classes?.length || 0}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" disabled>
-                      <Edit className="h-4 w-4" />
-                    </Button>
+                    <EditStaffDialog staffToEdit={s} onStaffUpdated={handleUpdateStaff}>
+                        <Button variant="ghost" size="icon">
+                            <Edit className="h-4 w-4" />
+                        </Button>
+                    </EditStaffDialog>
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="text-destructive">
@@ -252,7 +394,7 @@ export default function StaffManagementPage() {
                             <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the staff member's record.
+                                This action cannot be undone. This will permanently delete the staff member's record. Associated Firebase Auth user must be deleted manually.
                             </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -271,5 +413,3 @@ export default function StaffManagementPage() {
     </div>
   );
 }
-
-    
