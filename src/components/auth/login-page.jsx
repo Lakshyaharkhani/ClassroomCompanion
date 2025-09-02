@@ -64,7 +64,7 @@ export default function LoginPage({ onLogin }) {
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
   return (
-    <div className="flex flex-col justify-center items-center min-h-screen bg-background">
+    <div className="flex flex-col justify-center items-center min-h-screen bg-background px-4">
        <div className="container absolute top-0 left-0 right-0 flex items-center gap-3 p-6">
          <GraduationCap className="h-8 w-8 text-primary" />
          <span className="text-xl font-bold">Classroom Companion</span>

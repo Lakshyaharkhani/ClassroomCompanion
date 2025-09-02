@@ -4,9 +4,9 @@
 import { useState, useEffect } from "react";
 import { db } from "../../../lib/firebase";
 import { collection, getDocs, doc, setDoc, deleteDoc, query, where, updateDoc } from "firebase/firestore";
-import { Card, CardHeader, CardTitle, CardContent } from "../../../components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
-import { PlusCircle, Edit, Trash2, Search } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, ArrowLeft, User, BookOpen, Percent } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "../../../components/ui/dialog";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
@@ -17,7 +17,165 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { ScrollArea } from "../../../components/ui/scroll-area";
 import { useToast } from "../../../hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../../../components/ui/alert-dialog";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
+
+function StudentDetailsCard({ student, onBack }) {
+    const { toast } = useToast();
+    const [details, setDetails] = useState({ classes: [], attendance: { present: 0, total: 0 } });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchDetails = async () => {
+            if (!student) return;
+            setLoading(true);
+            try {
+                // 1. Fetch student's classes
+                const classesQuery = query(collection(db, "classes"), where("students", "array-contains", student.enrollment_number));
+                const classesSnapshot = await getDocs(classesQuery);
+                const classData = classesSnapshot.docs.map(doc => doc.data());
+
+                // 2. Fetch student's attendance
+                const classIds = classData.map(c => c.class_id);
+                let presentLectures = 0;
+                let totalLectures = 0;
+
+                if (classIds.length > 0) {
+                    const attendanceQuery = query(collection(db, "attendance"), where("class_id", "in", classIds));
+                    const attendanceSnapshot = await getDocs(attendanceQuery);
+                    attendanceSnapshot.forEach(doc => {
+                        const record = doc.data().records;
+                        if (record[student.enrollment_number] !== undefined) {
+                            totalLectures++;
+                            if (record[student.enrollment_number]) {
+                                presentLectures++;
+                            }
+                        }
+                    });
+                }
+                
+                setDetails({
+                    classes: classData,
+                    attendance: { present: presentLectures, total: totalLectures }
+                });
+
+            } catch (error) {
+                console.error("Error fetching student details:", error);
+                toast({ variant: "destructive", title: "Error", description: "Failed to load student details." });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDetails();
+    }, [student, toast]);
+
+    const attendancePercentage = details.attendance.total > 0 ? Math.round((details.attendance.present / details.attendance.total) * 100) : 0;
+    const chartData = [
+        { name: 'Present', value: details.attendance.present },
+        { name: 'Absent', value: details.attendance.total - details.attendance.present }
+    ];
+    const chartColors = {
+      Present: 'hsl(var(--primary))',
+      Absent: 'hsl(var(--destructive))'
+    };
+
+    const DetailRow = ({ label, value }) => (
+        <div className="flex justify-between py-2 border-b">
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className="text-sm font-medium text-right">{value || 'N/A'}</p>
+        </div>
+    );
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-4">
+                    <Button variant="ghost" size="icon" onClick={onBack}>
+                        <ArrowLeft />
+                    </Button>
+                    <CardTitle>{student.name} ({student.enrollment_number})</CardTitle>
+                </div>
+                <CardDescription>Viewing details for the selected student.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                {loading ? <p>Loading details...</p> : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="md:col-span-1 space-y-4">
+                            <Card>
+                                <CardHeader><CardTitle className="text-base flex items-center gap-2"><User />Personal Info</CardTitle></CardHeader>
+                                <CardContent>
+                                    <DetailRow label="Email" value={student.email} />
+                                    <DetailRow label="Phone" value={student.phone} />
+                                    <DetailRow label="Gender" value={student.gender} />
+                                    <DetailRow label="Date of Birth" value={student.dob} />
+                                </CardContent>
+                            </Card>
+                             <Card>
+                                <CardHeader><CardTitle className="text-base flex items-center gap-2"><BookOpen />Academic Info</CardTitle></CardHeader>
+                                <CardContent>
+                                    <DetailRow label="Program" value={student.details?.program} />
+                                    <DetailRow label="Department" value={student.department} />
+                                    <DetailRow label="Admission Year" value={student.details?.admissionYear} />
+                                </CardContent>
+                            </Card>
+                        </div>
+                        <div className="md:col-span-2 space-y-6">
+                            <Card>
+                                <CardHeader><CardTitle className="text-base flex items-center gap-2"><Percent/>Attendance</CardTitle></CardHeader>
+                                <CardContent className="flex flex-col md:flex-row items-center gap-4">
+                                     <div className="w-full md:w-1/2 h-40">
+                                         {details.attendance.total > 0 ? (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
+                                                         {chartData.map((entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={chartColors[entry.name]} />
+                                                        ))}
+                                                    </Pie>
+                                                    <Tooltip />
+                                                    <Legend />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                         ) : <p className="text-muted-foreground text-center w-full">No attendance data found.</p>}
+                                     </div>
+                                     <div className="flex-1 grid grid-cols-2 gap-4">
+                                         <div className="text-center p-4 rounded-lg bg-muted">
+                                             <p className="text-2xl font-bold">{attendancePercentage}%</p>
+                                             <p className="text-xs text-muted-foreground">Overall</p>
+                                         </div>
+                                         <div className="text-center p-4 rounded-lg bg-muted">
+                                             <p className="text-2xl font-bold">{details.attendance.present} / {details.attendance.total}</p>
+                                             <p className="text-xs text-muted-foreground">Present / Total</p>
+                                         </div>
+                                     </div>
+                                </CardContent>
+                            </Card>
+                             <Card>
+                                <CardHeader><CardTitle className="text-base">Enrolled Classes</CardTitle></CardHeader>
+                                <CardContent>
+                                    {details.classes.length > 0 ? (
+                                        <Table>
+                                            <TableHeader><TableRow><TableHead>Class Name</TableHead><TableHead>Department</TableHead></TableRow></TableHeader>
+                                            <TableBody>
+                                                {details.classes.map(c => (
+                                                    <TableRow key={c.class_id}>
+                                                        <TableCell>{c.class_name}</TableCell>
+                                                        <TableCell>{c.department}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    ) : <p className="text-muted-foreground text-center">Not enrolled in any classes.</p>}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    )
+}
 
 function AddStudentToCollegeDialog({ onStudentAdded }) {
   const { toast } = useToast();
@@ -36,21 +194,26 @@ function AddStudentToCollegeDialog({ onStudentAdded }) {
   const handleSubmit = async () => {
     const year = formData.admissionYear || new Date().getFullYear();
     const departmentCode = (formData.program || "CS").substring(0,2).toUpperCase();
+
+    const { studentName, email, program, mobile, dob, gender, ...details } = formData;
+    
     const newStudent = {
-       // Top-level fields for easy access and querying
+      // Top-level fields for easy access and querying
       enrollment_number: `${year}${departmentCode}${uid().substring(0,3).toUpperCase()}`,
-      name: formData.studentName || 'N/A',
-      email: formData.email || '',
+      name: studentName || 'N/A',
+      email: email || '',
       role: 'student',
-      department: formData.program || 'N/A', 
+      department: program || 'N/A', 
       class: '', // Assigned later
-      phone: formData.mobile || '',
-      dob: formData.dob || '',
-      gender: formData.gender || '',
+      phone: mobile || '',
+      dob: dob || '',
+      gender: gender || '',
       
       // A `details` object for all other information from the form
       details: {
-          ...formData,
+          ...details,
+          // also save the main fields in details for consistency
+          studentName, email, program, mobile, dob, gender,
       },
     };
     
@@ -74,7 +237,7 @@ function AddStudentToCollegeDialog({ onStudentAdded }) {
                 {field.label}
             </Label>
             {field.type === 'select' ? (
-                 <Select onValueChange={(value) => handleSelectChange(field.id, value)} value={data[field.id]}>
+                 <Select onValueChange={(value) => handleSelectChange(field.id, value)} value={data[field.id] || ''}>
                     <SelectTrigger className="col-span-3 h-8">
                         <SelectValue placeholder={field.placeholder} />
                     </SelectTrigger>
@@ -170,20 +333,22 @@ function AddStudentToCollegeDialog({ onStudentAdded }) {
 function EditStudentDialog({ studentToEdit, onStudentUpdated, children }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState(studentToEdit.details || {});
+  const [formData, setFormData] = useState({});
 
   useEffect(() => {
-    const initialData = {
-      ...(studentToEdit.details || {}),
-      studentName: studentToEdit.name,
-      email: studentToEdit.email,
-      program: studentToEdit.department,
-      mobile: studentToEdit.phone,
-      dob: studentToEdit.dob,
-      gender: studentToEdit.gender,
-    };
-    setFormData(initialData);
-  }, [studentToEdit]);
+     if(open && studentToEdit) {
+        const initialData = {
+          ...(studentToEdit.details || {}),
+          studentName: studentToEdit.name,
+          email: studentToEdit.email,
+          program: studentToEdit.department,
+          mobile: studentToEdit.phone,
+          dob: studentToEdit.dob,
+          gender: studentToEdit.gender,
+        };
+        setFormData(initialData);
+     }
+  }, [open, studentToEdit]);
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
@@ -195,23 +360,26 @@ function EditStudentDialog({ studentToEdit, onStudentUpdated, children }) {
   };
 
   const handleSubmit = async () => {
+    const { studentName, email, program, mobile, dob, gender, ...details } = formData;
+    
     const updatedStudentData = {
       ...studentToEdit,
-      name: formData.studentName,
-      email: formData.email,
-      department: formData.program,
-      phone: formData.mobile,
-      dob: formData.dob,
-      gender: formData.gender,
+      name: studentName,
+      email: email,
+      department: program,
+      phone: mobile,
+      dob: dob,
+      gender: gender,
       details: {
-        ...formData,
+        ...studentToEdit.details, // preserve any other details
+        ...details,
       },
     };
 
     try {
       const studentRef = doc(db, "users", studentToEdit.id);
       await updateDoc(studentRef, updatedStudentData);
-      onStudentUpdated(updatedStudentData);
+      onStudentUpdated({ ...updatedStudentData, id: studentToEdit.id });
       toast({ title: "Success", description: "Student details have been updated." });
       setOpen(false);
     } catch (error) {
@@ -227,7 +395,7 @@ function EditStudentDialog({ studentToEdit, onStudentUpdated, children }) {
                 {field.label}
             </Label>
             {field.type === 'select' ? (
-                 <Select onValueChange={(value) => handleSelectChange(field.id, value)} value={data[field.id]}>
+                 <Select onValueChange={(value) => handleSelectChange(field.id, value)} value={data[field.id] || ''}>
                     <SelectTrigger className="col-span-3 h-8">
                         <SelectValue placeholder={field.placeholder} />
                     </SelectTrigger>
@@ -312,6 +480,7 @@ export default function StudentManagementPage() {
   const [filteredStudents, setFilteredStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -367,6 +536,10 @@ export default function StudentManagementPage() {
       return <div className="flex justify-center items-center h-full"><p>Loading students...</p></div>
   }
 
+  if (selectedStudent) {
+    return <StudentDetailsCard student={selectedStudent} onBack={() => setSelectedStudent(null)} />;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -406,9 +579,9 @@ export default function StudentManagementPage() {
                     </TableCell>
                 </TableRow>
               ) : filteredStudents.map((student) => (
-                <TableRow key={student.id}>
+                <TableRow key={student.id} >
                   <TableCell>{student.enrollment_number}</TableCell>
-                  <TableCell className="font-medium">{student.name}</TableCell>
+                  <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => setSelectedStudent(student)}>{student.name}</TableCell>
                   <TableCell>{student.email}</TableCell>
                   <TableCell>{student.department}</TableCell>
                   <TableCell>{student.class || 'N/A'}</TableCell>
@@ -447,3 +620,5 @@ export default function StudentManagementPage() {
     </div>
   );
 }
+
+    

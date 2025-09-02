@@ -59,7 +59,7 @@ function AddStaffDialog({ onStaffAdded }) {
                 {field.label}
             </Label>
             {field.type === 'select' ? (
-                 <Select onValueChange={(value) => handleSelectChange(field.id, value)} defaultValue={formData[field.id]}>
+                 <Select onValueChange={(value) => handleSelectChange(field.id, value)} value={formData[field.id] || ''}>
                     <SelectTrigger className="col-span-3 h-8">
                         <SelectValue placeholder={field.placeholder} />
                     </SelectTrigger>
@@ -158,21 +158,23 @@ function EditStaffDialog({ staffToEdit, onStaffUpdated, children }) {
   const [formData, setFormData] = useState({});
 
   useEffect(() => {
-    // This combines the top-level fields and the `details` object into one flat object for the form
-    const initialData = {
-      ...(staffToEdit.details || {}),
-      staffName: staffToEdit.name,
-      email: staffToEdit.email,
-      department: staffToEdit.department,
-      designation: staffToEdit.designation,
-      phone: staffToEdit.phone,
-      joiningDate: staffToEdit.joining_date,
-      qualification: staffToEdit.qualification,
-      gender: staffToEdit.gender,
-      dob: staffToEdit.dob,
-    };
-    setFormData(initialData);
-  }, [staffToEdit]);
+    if (open && staffToEdit) {
+        // This combines the top-level fields and the `details` object into one flat object for the form
+        const initialData = {
+          ...(staffToEdit.details || {}),
+          staffName: staffToEdit.name,
+          email: staffToEdit.email,
+          department: staffToEdit.department,
+          designation: staffToEdit.designation,
+          phone: staffToEdit.phone,
+          joiningDate: staffToEdit.joining_date,
+          qualification: staffToEdit.qualification,
+          gender: staffToEdit.gender,
+          dob: staffToEdit.dob,
+        };
+        setFormData(initialData);
+    }
+  }, [open, staffToEdit]);
 
 
   const handleInputChange = (e) => {
@@ -185,27 +187,29 @@ function EditStaffDialog({ staffToEdit, onStaffUpdated, children }) {
   }
 
   const handleSubmit = async () => {
+    const { staffName, email, department, designation, phone, joiningDate, qualification, gender, dob, ...details } = formData;
+    
     // Reconstruct the object to be saved in Firestore
     const updatedStaffData = {
       ...staffToEdit,
-      name: formData.staffName,
-      email: formData.email, // Note: email is not editable to maintain consistency with Firebase Auth
-      department: formData.department,
-      designation: formData.designation,
-      phone: formData.phone,
-      joining_date: formData.joiningDate,
-      qualification: formData.qualification,
-      gender: formData.gender,
-      dob: formData.dob,
+      name: staffName,
+      email: email, // Note: email is not editable to maintain consistency with Firebase Auth
+      department: department,
+      designation: designation,
+      phone: phone,
+      joining_date: joiningDate,
+      qualification: qualification,
+      gender: gender,
+      dob: dob,
       details: {
-        ...formData,
+        ...details,
       },
     };
 
     try {
       const staffRef = doc(db, "users", staffToEdit.id);
       await updateDoc(staffRef, updatedStaffData);
-      onStaffUpdated(updatedStaffData);
+      onStaffUpdated({ ...updatedStaffData, id: staffToEdit.id });
       toast({ title: "Success", description: "Staff details have been updated." });
       setOpen(false);
     } catch (error) {
@@ -413,3 +417,5 @@ export default function StaffManagementPage() {
     </div>
   );
 }
+
+    
