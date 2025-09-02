@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '../../lib/firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, query, where, collection, getDocs } from 'firebase/firestore';
 
 const AuthContext = createContext(null);
@@ -77,7 +77,17 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const value = { user, loading, login, logout };
+  const resetPassword = async (email) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      console.error("Password reset error:", error);
+      // We throw the error so the UI layer can decide what message to show.
+      throw new Error(error.code);
+    }
+  };
+
+  const value = { user, loading, login, logout, resetPassword };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -6,12 +7,16 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { GraduationCap, LogIn, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "./auth-provider";
+import { useToast } from "../../hooks/use-toast";
 
 export default function LoginPage({ onLogin }) {
   const [role, setRole] = useState("student");
   const [email, setEmail] = useState("student0@example.com");
   const [password, setPassword] = useState("password123");
   const [showPassword, setShowPassword] = useState(false);
+  const { resetPassword } = useAuth();
+  const { toast } = useToast();
 
   const handleLogin = () => {
     if (email.trim() && password.trim()) {
@@ -28,7 +33,33 @@ export default function LoginPage({ onLogin }) {
     } else {
       setEmail('student0@example.com');
     }
+    setPassword("password123");
   }
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      toast({
+        variant: "destructive",
+        title: "Email is required",
+        description: "Please enter your email address to reset your password.",
+      });
+      return;
+    }
+    try {
+      await resetPassword(email);
+      toast({
+        title: "Password Reset Email Sent",
+        description: `If an account exists for ${email}, a password reset link has been sent to it.`,
+      });
+    } catch (error) {
+      console.error("Failed to send password reset email:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not send password reset email. Please try again.",
+      });
+    }
+  };
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
@@ -73,7 +104,7 @@ export default function LoginPage({ onLogin }) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Password</Label>
-              <Button variant="link" className="h-auto p-0 text-xs">
+              <Button variant="link" className="h-auto p-0 text-xs" onClick={handlePasswordReset}>
                 Forgot password?
               </Button>
             </div>
