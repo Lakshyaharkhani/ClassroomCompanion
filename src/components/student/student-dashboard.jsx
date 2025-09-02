@@ -3,13 +3,14 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { BookOpen, CalendarCheck, User } from "lucide-react";
+import { BookOpen, CalendarCheck, User, Percent } from "lucide-react";
 import { db } from "../../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { useToast } from "../../hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 
 function SubjectDetailsDialog({ subjects, children }) {
@@ -51,7 +52,7 @@ function SubjectDetailsDialog({ subjects, children }) {
 
 
 export default function StudentDashboard({ user }) {
-  const [dashboardData, setDashboardData] = useState({ totalSubjects: 0, attendancePercent: 0, subjectDetails: [] });
+  const [dashboardData, setDashboardData] = useState({ totalSubjects: 0, attendancePercent: 0, subjectDetails: [], chartData: [] });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -87,6 +88,7 @@ export default function StudentDashboard({ user }) {
         const studentClassIds = studentClasses.map(c => c.class_id);
 
         let attendancePercent = 0;
+        let chartData = [];
 
         if (studentClassIds.length > 0) {
             // 3. Fetch attendance for those classes
@@ -111,9 +113,14 @@ export default function StudentDashboard({ user }) {
             if (totalLectures > 0) {
                  attendancePercent = Math.round((presentLectures / totalLectures) * 100);
             }
+            
+            chartData = [
+                { name: 'Present', value: presentLectures },
+                { name: 'Absent', value: totalLectures - presentLectures }
+            ];
         }
         
-        setDashboardData({ totalSubjects, attendancePercent, subjectDetails });
+        setDashboardData({ totalSubjects, attendancePercent, subjectDetails, chartData });
 
       } catch (error) {
           console.error("Error fetching student dashboard data:", error);
@@ -125,6 +132,12 @@ export default function StudentDashboard({ user }) {
 
     fetchData();
   }, [user, toast]);
+  
+  const attendanceChartColors = {
+      Present: 'hsl(var(--primary))',
+      Absent: 'hsl(var(--destructive))'
+  };
+
 
   const DetailRow = ({ label, value }) => (
     <div className="flex justify-between py-2 border-b border-muted/50">
@@ -168,14 +181,73 @@ export default function StudentDashboard({ user }) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Overall Attendance</CardTitle>
-            <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+            <Percent className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{dashboardData.attendancePercent}%</div>
-            <p className="text-xs text-muted-foreground">Keep it up!</p>
+            <p className="text-xs text-muted-foreground">Across all subjects</p>
           </CardContent>
         </Card>
+
+        <a href="/student/attendance">
+         <Card className="cursor-pointer hover:border-primary transition-colors">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Attendance Calendar</CardTitle>
+            <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+             <div className="text-2xl font-bold">View History</div>
+             <p className="text-xs text-muted-foreground">See a day-by-day record</p>
+          </CardContent>
+        </Card>
+        </a>
       </div>
+
+       <Card>
+        <CardHeader>
+          <CardTitle>Attendance Overview</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {dashboardData.chartData.reduce((sum, item) => sum + item.value, 0) > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={dashboardData.chartData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  labelLine={false}
+                  label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }) => {
+                      if (percent === 0) return null; // Do not render label for 0%
+                      const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                      const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
+                      const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+                      return (
+                          <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central">
+                              {`${(percent * 100).toFixed(0)}%`}
+                          </text>
+                      );
+                  }}
+                >
+                  {dashboardData.chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={attendanceChartColors[entry.name]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">No attendance has been marked for you yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
 
       <Card>
         <CardHeader>
