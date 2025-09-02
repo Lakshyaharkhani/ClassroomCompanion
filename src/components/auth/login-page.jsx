@@ -5,12 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
-import { GraduationCap, LogIn } from "lucide-react";
+import { GraduationCap, LogIn, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage({ onLogin }) {
   const [role, setRole] = useState("student");
   const [email, setEmail] = useState("student0@example.com");
   const [password, setPassword] = useState("password123");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = () => {
     if (email.trim() && password.trim()) {
@@ -28,6 +29,8 @@ export default function LoginPage({ onLogin }) {
       setEmail('student0@example.com');
     }
   }
+
+  const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-background">
@@ -74,14 +77,32 @@ export default function LoginPage({ onLogin }) {
                 Forgot password?
               </Button>
             </div>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute top-0 right-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={togglePasswordVisibility}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                )}
+                <span className="sr-only">
+                  {showPassword ? "Hide password" : "Show password"}
+                </span>
+              </Button>
+            </div>
           </div>
           <Button onClick={handleLogin} className="w-full" size="lg">
             <LogIn className="mr-2 h-4 w-4" /> Login

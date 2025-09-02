@@ -61,7 +61,6 @@ export async function createAdminUser(userData) {
     }
 }
 
-
 export async function seedDatabase() {
     try {
         const batch = writeBatch(db);
