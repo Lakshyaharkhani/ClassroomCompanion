@@ -1,3 +1,4 @@
+
 export const adminNav = [
   { title: "Dashboard", href: "/admin/dashboard" },
   { title: "Student Management", href: "/admin/students" },
@@ -9,6 +10,7 @@ export const adminNav = [
 export const staffNav = [
   { title: "Dashboard", href: "/staff/dashboard" },
   { title: "Attendance", href: "/staff/attendance" },
+  { title: "My Classes", href: "/staff/classes" },
 ];
 
 export const studentNav = [

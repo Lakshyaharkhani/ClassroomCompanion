@@ -1,13 +1,12 @@
 
-
 "use client";
 
 import { useState, useEffect } from "react";
 import { db } from "../../../lib/firebase";
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, addDoc } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
-import { PlusCircle, Edit, Trash2, UserPlus, ArrowLeft, UserSquare, X } from "lucide-react";
+import { PlusCircle, Edit, Trash2, UserPlus, ArrowLeft, UserSquare, X, FilePlus, FileText, CheckSquare, Type } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "../../../components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../../../components/ui/alert-dialog";
 import { Input } from "../../../components/ui/input";
@@ -18,6 +17,179 @@ import { Separator } from "../../../components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { ScrollArea } from "../../../components/ui/scroll-area";
 import { useToast } from "../../../hooks/use-toast";
+import { Textarea } from "../../../components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "../../../components/ui/radio-group";
+
+function CreateAssignmentDialog({ classDetails, onAssignmentCreated }) {
+    const { toast } = useToast();
+    const [open, setOpen] = useState(false);
+    const [assignmentName, setAssignmentName] = useState('');
+    const [dueDate, setDueDate] = useState('');
+    const [questions, setQuestions] = useState([{ text: '', type: 'mcq', options: ['', ''], correctAnswerIndex: 0 }]);
+
+    const handleQuestionChange = (index, field, value) => {
+        const newQuestions = [...questions];
+        newQuestions[index][field] = value;
+        setQuestions(newQuestions);
+    };
+
+    const handleOptionChange = (qIndex, oIndex, value) => {
+        const newQuestions = [...questions];
+        newQuestions[qIndex].options[oIndex] = value;
+        setQuestions(newQuestions);
+    };
+
+    const addOption = (qIndex) => {
+        const newQuestions = [...questions];
+        newQuestions[qIndex].options.push('');
+        setQuestions(newQuestions);
+    };
+
+    const removeOption = (qIndex, oIndex) => {
+        const newQuestions = [...questions];
+        newQuestions[qIndex].options.splice(oIndex, 1);
+        setQuestions(newQuestions);
+    }
+
+    const addQuestion = (type) => {
+        if (type === 'mcq') {
+            setQuestions([...questions, { text: '', type: 'mcq', options: ['', ''], correctAnswerIndex: 0 }]);
+        } else {
+            setQuestions([...questions, { text: '', type: 'brief' }]);
+        }
+    };
+
+    const removeQuestion = (index) => {
+        const newQuestions = questions.filter((_, i) => i !== index);
+        setQuestions(newQuestions);
+    };
+
+    const handleSubmit = async () => {
+        if (!assignmentName || !dueDate || questions.some(q => !q.text)) {
+            toast({ variant: "destructive", title: "Error", description: "Please fill all required fields." });
+            return;
+        }
+
+        const newAssignment = {
+            classId: classDetails.class_id,
+            assignmentName,
+            dueDate,
+            questions: questions.map(q => {
+                if (q.type === 'mcq') {
+                    return {
+                        text: q.text,
+                        type: q.type,
+                        options: q.options,
+                        correctAnswer: q.options[q.correctAnswerIndex]
+                    }
+                }
+                return q;
+            }),
+        };
+
+        try {
+            const docRef = await addDoc(collection(db, "assignments"), newAssignment);
+            onAssignmentCreated({ ...newAssignment, id: docRef.id });
+            toast({ title: "Success", description: "New assignment has been created." });
+            setOpen(false);
+            // Reset form
+            setAssignmentName('');
+            setDueDate('');
+            setQuestions([{ text: '', type: 'mcq', options: ['', ''], correctAnswerIndex: 0 }]);
+        } catch (error) {
+            console.error("Error creating assignment: ", error);
+            toast({ variant: "destructive", title: "Error", description: "Could not create assignment." });
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline">
+                    <FilePlus className="mr-2" />
+                    Create Assignment
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle>Create New Assignment for {classDetails.class_name}</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="h-[70vh] pr-6">
+                    <div className="space-y-6 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="assignmentName">Assignment Name</Label>
+                                <Input id="assignmentName" value={assignmentName} onChange={(e) => setAssignmentName(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="dueDate">Due Date</Label>
+                                <Input id="dueDate" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                            </div>
+                        </div>
+
+                        <Separator />
+
+                        <div>
+                            <h3 className="text-lg font-semibold mb-4">Questions</h3>
+                            <div className="space-y-4">
+                                {questions.map((q, qIndex) => (
+                                    <Card key={qIndex}>
+                                        <CardContent className="pt-6">
+                                            <div className="flex justify-between items-start">
+                                                <div className="w-full pr-4">
+                                                     <Label htmlFor={`q-text-${qIndex}`}>Question {qIndex + 1}</Label>
+                                                     <Textarea id={`q-text-${qIndex}`} value={q.text} onChange={(e) => handleQuestionChange(qIndex, 'text', e.target.value)} placeholder="Enter your question text..." />
+                                                </div>
+                                                <Button variant="ghost" size="icon" className="text-destructive mt-4" onClick={() => removeQuestion(qIndex)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                           
+                                            {q.type === 'mcq' && (
+                                                <div className="mt-4 pl-2 space-y-3">
+                                                    <Label>Options (select the correct answer)</Label>
+                                                    <RadioGroup value={String(q.correctAnswerIndex)} onValueChange={(val) => handleQuestionChange(qIndex, 'correctAnswerIndex', parseInt(val,10))}>
+                                                    {q.options.map((opt, oIndex) => (
+                                                        <div key={oIndex} className="flex items-center gap-2">
+                                                          <RadioGroupItem value={String(oIndex)} id={`q${qIndex}-opt${oIndex}`} />
+                                                          <Input value={opt} onChange={(e) => handleOptionChange(qIndex, oIndex, e.target.value)} placeholder={`Option ${oIndex + 1}`} className="flex-1 h-8" />
+                                                          <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => removeOption(qIndex, oIndex)} disabled={q.options.length <= 2}>
+                                                              <X className="h-4 w-4"/>
+                                                          </Button>
+                                                        </div>
+                                                    ))}
+                                                    </RadioGroup>
+                                                    <Button variant="outline" size="sm" className="mt-2" onClick={() => addOption(qIndex)}>
+                                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Option
+                                                    </Button>
+                                                </div>
+                                            )}
+                                             {q.type === 'brief' && (
+                                                 <div className="mt-4 pl-2 space-y-2">
+                                                    <Label className="text-muted-foreground">Brief Answer</Label>
+                                                    <Textarea placeholder="Student will type their answer here..." disabled />
+                                                 </div>
+                                             )}
+
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                             <div className="flex gap-2 mt-4">
+                                <Button variant="outline" onClick={() => addQuestion('mcq')}><CheckSquare className="mr-2"/> Add MCQ</Button>
+                                <Button variant="outline" onClick={() => addQuestion('brief')}><Type className="mr-2"/> Add Brief Answer</Button>
+                            </div>
+                        </div>
+
+                    </div>
+                </ScrollArea>
+                <DialogFooter>
+                    <Button type="submit" onClick={handleSubmit}>Create Assignment</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 
 function CreateClassDialog({ onClassCreated }) {
@@ -29,7 +201,26 @@ function CreateClassDialog({ onClassCreated }) {
   const [capacity, setCapacity] = useState('');
   const [room, setRoom] = useState('');
   const [subjects, setSubjects] = useState([{ subjectName: '', staffId: '' }]);
-  const [allStaff] = useState(seedStaff);
+  const [allStaff, setAllStaff] = useState([]);
+
+   useEffect(() => {
+    // Fetch staff only when the dialog is about to open to avoid unnecessary fetches.
+    if (open) {
+      const fetchStaff = async () => {
+        try {
+          const querySnapshot = await getDocs(collection(db, "users"));
+          const staffData = querySnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(user => user.role === 'staff');
+          setAllStaff(staffData);
+        } catch (error) {
+          console.error("Error fetching staff:", error);
+          toast({ variant: "destructive", title: "Error", description: "Could not fetch staff list." });
+        }
+      };
+      fetchStaff();
+    }
+  }, [open, toast]);
 
 
   const handleSubjectChange = (index, field, value) => {
@@ -162,13 +353,42 @@ function CreateClassDialog({ onClassCreated }) {
 function EditClassDialog({ classToEdit, onClassUpdated, children }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [className, setClassName] = useState(classToEdit.class_name);
-  const [department, setDepartment] = useState(classToEdit.department);
-  const [semester, setSemester] = useState(classToEdit.semester);
-  const [capacity, setCapacity] = useState(classToEdit.capacity);
-  const [room, setRoom] = useState(classToEdit.room_number);
-  const [subjects, setSubjects] = useState(classToEdit.subjects || []);
-  const [allStaff] = useState(seedStaff);
+  const [className, setClassName] = useState('');
+  const [department, setDepartment] = useState('');
+  const [semester, setSemester] = useState('');
+  const [capacity, setCapacity] = useState('');
+  const [room, setRoom] = useState('');
+  const [subjects, setSubjects] = useState([]);
+  const [allStaff, setAllStaff] = useState([]);
+
+  useEffect(() => {
+    if (classToEdit) {
+      setClassName(classToEdit.class_name);
+      setDepartment(classToEdit.department);
+      setSemester(classToEdit.semester);
+      setCapacity(classToEdit.capacity);
+      setRoom(classToEdit.room_number);
+      setSubjects(classToEdit.subjects || []);
+    }
+  }, [classToEdit]);
+
+  useEffect(() => {
+    if (open) {
+      const fetchStaff = async () => {
+        try {
+          const querySnapshot = await getDocs(collection(db, "users"));
+          const staffData = querySnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(user => user.role === 'staff');
+          setAllStaff(staffData);
+        } catch (error) {
+          console.error("Error fetching staff:", error);
+          toast({ variant: "destructive", title: "Error", description: "Could not fetch staff list." });
+        }
+      };
+      fetchStaff();
+    }
+  }, [open, toast]);
 
 
   const handleSubjectChange = (index, field, value) => {
@@ -294,7 +514,23 @@ function AddStudentToClassDialog({ classDetails, onStudentAdded }) {
     const [open, setOpen] = useState(false);
     const [enrollmentNumber, setEnrollmentNumber] = useState('');
     const [error, setError] = useState('');
-    const [allStudents] = useState(seedStudents);
+    const [allStudents, setAllStudents] = useState([]);
+
+    useEffect(() => {
+      if (open) {
+        const fetchStudents = async () => {
+          try {
+            const q = query(collection(db, "users"), where("role", "==", "student"));
+            const snapshot = await getDocs(q);
+            const studentData = snapshot.docs.map(doc => doc.data());
+            setAllStudents(studentData);
+          } catch(e) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch students' });
+          }
+        }
+        fetchStudents();
+      }
+    }, [open, toast]);
 
     const handleSubmit = async () => {
         const studentExists = allStudents.some(s => s.enrollment_number === enrollmentNumber);
@@ -360,7 +596,18 @@ function AddStaffToClassDialog({ classDetails, onStaffAdded }) {
     const [open, setOpen] = useState(false);
     const [staffId, setStaffId] = useState('');
     const [error, setError] = useState('');
-    const [allStaff] = useState(seedStaff);
+    const [allStaff, setAllStaff] = useState([]);
+
+    useEffect(() => {
+        if(open) {
+            const fetchStaff = async () => {
+                const q = query(collection(db, "users"), where("role", "==", "staff"));
+                const snapshot = await getDocs(q);
+                setAllStaff(snapshot.docs.map(doc => doc.data()));
+            }
+            fetchStaff();
+        }
+    }, [open]);
 
     const handleSubmit = async () => {
         const staffExists = allStaff.some(s => s.staff_id === staffId);
@@ -421,12 +668,23 @@ function AddStaffToClassDialog({ classDetails, onStaffAdded }) {
     )
 }
 
-function ClassDetails({ classDetails, onBack, onStudentAddedToClass, onStudentRemovedFromClass, onStaffAddedToClass, onStaffRemovedFromClass }) {
-    const [allStudents] = useState(seedStudents);
-    const [allStaff] = useState(seedStaff);
+function ClassDetails({ classDetails, onBack, onStudentAddedToClass, onStudentRemovedFromClass, onStaffAddedToClass, onStaffRemovedFromClass, onAssignmentCreated }) {
+    const [allStudents, setAllStudents] = useState([]);
+    const [allStaff, setAllStaff] = useState([]);
     
     const studentsInClass = allStudents.filter(s => classDetails.students.includes(s.enrollment_number));
     const staffInClass = allStaff.filter(s => classDetails.staff.includes(s.staff_id));
+
+    useEffect(() => {
+        const fetchUsers = async () => {
+            const studentQuery = query(collection(db, "users"), where("role", "==", "student"));
+            const staffQuery = query(collection(db, "users"), where("role", "==", "staff"));
+            const [studentSnapshot, staffSnapshot] = await Promise.all([getDocs(studentQuery), getDocs(staffQuery)]);
+            setAllStudents(studentSnapshot.docs.map(doc => doc.data()));
+            setAllStaff(staffSnapshot.docs.map(doc => doc.data()));
+        }
+        fetchUsers();
+    }, []);
 
     return (
         <Card>
@@ -438,6 +696,7 @@ function ClassDetails({ classDetails, onBack, onStudentAddedToClass, onStudentRe
                         </Button>
                         <CardTitle>{classDetails.class_name} ({classDetails.class_id})</CardTitle>
                     </div>
+                     <CreateAssignmentDialog classDetails={classDetails} onAssignmentCreated={onAssignmentCreated} />
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -520,6 +779,7 @@ function ClassDetails({ classDetails, onBack, onStudentAddedToClass, onStudentRe
 export default function ClassManagementPage() {
   const { toast } = useToast();
   const [classes, setClasses] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState(null);
 
@@ -538,6 +798,10 @@ export default function ClassManagementPage() {
     };
     fetchClasses();
   }, [toast]);
+  
+  const handleAssignmentCreated = (newAssignment) => {
+      setAssignments([...assignments, newAssignment]);
+  };
 
   const handleCreateClass = (newClass) => {
     setClasses([...classes, newClass]);
@@ -670,6 +934,7 @@ export default function ClassManagementPage() {
         onStudentRemovedFromClass={handleRemoveStudentFromClass}
         onStaffAddedToClass={handleAddStaffToClass}
         onStaffRemovedFromClass={handleRemoveStaffFromClass}
+        onAssignmentCreated={handleAssignmentCreated}
     />;
   }
 
@@ -703,14 +968,14 @@ export default function ClassManagementPage() {
                     <TableCell colSpan="8" className="text-center h-24">No classes found. You can create one to get started.</TableCell>
                 </TableRow>
               ) : classes.map((c) => (
-                <TableRow key={c.class_id}>
-                  <TableCell className="cursor-pointer hover:underline" onClick={() => viewClassDetails(c.class_id)}>{c.class_id}</TableCell>
-                  <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => viewClassDetails(c.class_id)}>{c.class_name}</TableCell>
-                  <TableCell className="cursor-pointer" onClick={() => viewClassDetails(c.class_id)}>{c.department}</TableCell>
-                  <TableCell className="cursor-pointer" onClick={() => viewClassDetails(c.class_id)}>{c.semester}</TableCell>
-                  <TableCell className="cursor-pointer" onClick={() => viewClassDetails(c.class_id)}>{c.subjects?.length || (c.subject ? 1 : 0)}</TableCell>
-                  <TableCell className="cursor-pointer" onClick={() => viewClassDetails(c.class_id)}>{c.staff.length}</TableCell>
-                  <TableCell className="cursor-pointer" onClick={() => viewClassDetails(c.class_id)}>{c.students.length}</TableCell>
+                <TableRow key={c.class_id} className="cursor-pointer" onClick={() => viewClassDetails(c.class_id)}>
+                  <TableCell>{c.class_id}</TableCell>
+                  <TableCell className="font-medium">{c.class_name}</TableCell>
+                  <TableCell>{c.department}</TableCell>
+                  <TableCell>{c.semester}</TableCell>
+                  <TableCell>{c.subjects?.length || 0}</TableCell>
+                  <TableCell>{c.staff.length}</TableCell>
+                  <TableCell>{c.students.length}</TableCell>
                   <TableCell className="text-right">
                     <div onClick={(e) => e.stopPropagation()}>
                         <EditClassDialog classToEdit={c} onClassUpdated={handleUpdateClass}>
