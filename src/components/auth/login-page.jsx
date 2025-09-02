@@ -1,0 +1,93 @@
+"use client";
+
+import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import { Label } from "../ui/label";
+import { GraduationCap, LogIn } from "lucide-react";
+
+export default function LoginPage({ onLogin }) {
+  const [role, setRole] = useState("student");
+  const [email, setEmail] = useState("student0@example.com");
+  const [password, setPassword] = useState("password123");
+
+  const handleLogin = () => {
+    if (email.trim() && password.trim()) {
+      onLogin({ email: email.trim(), role, password });
+    }
+  };
+
+  const handleRoleChange = (newRole) => {
+    setRole(newRole);
+    if (newRole === 'admin') {
+      setEmail('admin@example.com');
+    } else if (newRole === 'staff') {
+      setEmail('staff0@example.com');
+    } else {
+      setEmail('student0@example.com');
+    }
+  }
+
+  return (
+    <div className="flex flex-col justify-center items-center min-h-screen bg-background">
+       <div className="container absolute top-0 left-0 right-0 flex items-center gap-3 p-6">
+         <GraduationCap className="h-8 w-8 text-primary" />
+         <span className="text-xl font-bold">Classroom Companion</span>
+      </div>
+      <Card className="max-w-md w-full">
+        <CardHeader>
+          <CardTitle className="text-3xl font-bold text-center">Login</CardTitle>
+          <CardDescription className="text-center">Please select your role and login to continue.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+             <Label>Role</Label>
+            <div className="flex gap-2">
+              {(["student", "staff", "admin"]).map((r) => (
+                <Button
+                  key={r}
+                  variant={role === r ? "default" : "outline"}
+                  onClick={() => handleRoleChange(r)}
+                  className="capitalize flex-1"
+                >
+                  {r}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Button variant="link" className="h-auto p-0 text-xs">
+                Forgot password?
+              </Button>
+            </div>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+            />
+          </div>
+          <Button onClick={handleLogin} className="w-full" size="lg">
+            <LogIn className="mr-2 h-4 w-4" /> Login
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

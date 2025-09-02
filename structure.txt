@@ -1,0 +1,132 @@
+
+.
+├── .env
+├── README.md
+├── apphosting.yaml
+├── components.json
+├── next.config.js
+├── next.config.ts
+├── package.json
+├── src
+│   ├── ai
+│   │   ├── dev.ts
+│   │   ├── flows
+│   │   │   └── suggest-class-name.ts
+│   │   └── genkit.ts
+│   ├── app
+│   │   ├── actions.js
+│   │   ├── actions.ts
+│   │   ├── globals.css
+│   │   ├── layout.jsx
+│   │   ├── layout.tsx
+│   │   ├── page.jsx
+│   │   └── page.tsx
+│   ├── components
+│   │   ├── activities
+│   │   │   ├── activities-page.jsx
+│   │   │   └── activities-page.tsx
+│   │   ├── attendance
+│   │   │   ├── attendance-page.jsx
+│   │   │   └── attendance-page.tsx
+│   │   ├── auth
+│   │   │   ├── login-page.jsx
+│   │   │   └── login-page.tsx
+│   │   ├── classes
+│   │   │   ├── classes-page.jsx
+│   │   │   ├── classes-page.tsx
+│   │   │   ├── suggest-name-dialog.jsx
+│   │   │   └── suggest-name-dialog.tsx
+│   │   ├── dashboard
+│   │   │   ├── dashboard-page.jsx
+│   │   │   └── dashboard-page.tsx
+│   │   ├── layout
+│   │   │   ├── header.jsx
+│   │   │   ├── header.tsx
+│   │   │   ├── nav-menu.jsx
+│   │   │   └── nav-menu.tsx
+│   │   ├── reports
+│   │   │   ├── reports-page.jsx
+│   │   │   └── reports-page.tsx
+│   │   └── ui
+│   │       ├── accordion.jsx
+│   │       ├── accordion.tsx
+│   │       ├── alert-dialog.jsx
+│   │       ├── alert-dialog.tsx
+│   │       ├── alert.jsx
+│   │       ├── alert.tsx
+│   │       ├── avatar.jsx
+│   │       ├── avatar.tsx
+│   │       ├── badge.jsx
+│   │       ├── badge.tsx
+│   │       ├── button.jsx
+│   │       ├── button.tsx
+│   │       ├── calendar.jsx
+│   │       ├── calendar.tsx
+│   │       ├── card.jsx
+│   │       ├── card.tsx
+│   │       ├── carousel.jsx
+│   │       ├── carousel.tsx
+│   │       ├── chart.jsx
+│   │       ├── chart.tsx
+│   │       ├── checkbox.jsx
+│   │       ├── checkbox.tsx
+│   │       ├── collapsible.jsx
+│   │       ├── collapsible.tsx
+│   │       ├── dialog.jsx
+│   │       ├── dialog.tsx
+│   │       ├── dropdown-menu.jsx
+│   │       ├── dropdown-menu.tsx
+│   │       ├── form.jsx
+│   │       ├── form.tsx
+│   │       ├── input.jsx
+│   │       ├── input.tsx
+│   │       ├── label.jsx
+│   │       ├── label.tsx
+│   │       ├── menubar.jsx
+│   │       ├── menubar.tsx
+│   │       ├── popover.jsx
+│   │       ├── popover.tsx
+│   │       ├── progress.jsx
+│   │       ├── progress.tsx
+│   │       ├── radio-group.jsx
+│   │       ├── radio-group.tsx
+│   │       ├── scroll-area.jsx
+│   │       ├── scroll-area.tsx
+│   │       ├── select.jsx
+│   │       ├── select.tsx
+│   │       ├── separator.jsx
+│   │       ├── separator.tsx
+│   │       ├── sheet.jsx
+│   │       ├── sheet.tsx
+│   │       ├── sidebar.jsx
+│   │       ├── sidebar.tsx
+│   │       ├── skeleton.jsx
+│   │       ├── skeleton.tsx
+│   │       ├── slider.jsx
+│   │       ├── slider.tsx
+│   │       ├── switch.jsx
+│   │       ├── switch.tsx
+│   │       ├── table.jsx
+│   │       ├── table.tsx
+│   │       ├── tabs.jsx
+│   │       ├── tabs.tsx
+│   │       ├── textarea.jsx
+│   │       ├── textarea.tsx
+│   │       ├── toast.jsx
+│   │       ├── toast.tsx
+│   │       ├── toaster.jsx
+│   │       ├── toaster.tsx
+│   │       └── tooltip.jsx
+│   ├── hooks
+│   │   ├── use-mobile.jsx
+│   │   ├── use-mobile.tsx
+│   │   ├── use-toast.js
+│   │   └── use-toast.ts
+│   └── lib
+│       ├── data.js
+│       ├── data.ts
+│       ├── utils.js
+│       └── utils.ts
+├── tailwind.config.js
+├── tailwind.config.ts
+└── tsconfig.json
