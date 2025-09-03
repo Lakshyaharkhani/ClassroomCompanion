@@ -3,17 +3,18 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../ui/card";
-import { Users, UserPlus, BookCopy, Database, ShieldPlus, UserCog, Upload, Download } from "lucide-react";
+import { Users, UserPlus, BookCopy, Database, ShieldPlus, UserCog, Upload, Download, Settings, ToggleLeft, ToggleRight } from "lucide-react";
 import { Button } from "../ui/button";
 import { seedDatabase, createAdminUser, bulkCreateStudentUsers } from "../../app/actions";
 import { useToast } from "../../hooks/use-toast";
 import { db } from "../../lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, getDoc, setDoc } from "firebase/firestore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Skeleton } from "../ui/skeleton";
 import * as XLSX from 'xlsx';
+import { Switch } from "../ui/switch";
 
 
 function AddAdminDialog() {
@@ -134,7 +135,9 @@ function BulkUploadCard() {
             }
             
             setFile(null); // Reset file input
-            document.getElementById('student-upload-input').value = '';
+            if(document.getElementById('student-upload-input')) {
+              document.getElementById('student-upload-input').value = '';
+            }
             setIsUploading(false);
         };
         reader.readAsArrayBuffer(file);
@@ -175,6 +178,62 @@ function BulkUploadCard() {
             </div>
         </div>
     )
+}
+
+function AppSettingsCard() {
+    const { toast } = useToast();
+    const [allowStudentEditing, setAllowStudentEditing] = useState(false);
+    const [loading, setLoading] = useState(true);
+    
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const settingsRef = doc(db, "settings", "config");
+                const docSnap = await getDoc(settingsRef);
+                if (docSnap.exists()) {
+                    setAllowStudentEditing(docSnap.data().allowStudentProfileEditing);
+                } else {
+                    // If the document doesn't exist, create it with a default value
+                    await setDoc(settingsRef, { allowStudentProfileEditing: false });
+                    setAllowStudentEditing(false);
+                }
+            } catch (error) {
+                console.error("Error fetching settings:", error);
+                toast({ variant: "destructive", title: "Error", description: "Could not load app settings." });
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchSettings();
+    }, [toast]);
+    
+    const handleToggle = async (checked) => {
+        setAllowStudentEditing(checked);
+        try {
+            const settingsRef = doc(db, "settings", "config");
+            await setDoc(settingsRef, { allowStudentProfileEditing: checked }, { merge: true });
+            toast({ title: "Setting Updated", description: `Students are now ${checked ? 'allowed' : 'prevented from'} editing their profiles.` });
+        } catch (error) {
+            console.error("Error updating setting:", error);
+            toast({ variant: "destructive", title: "Error", description: "Could not update the setting." });
+            setAllowStudentEditing(!checked); // Revert on error
+        }
+    }
+
+    return (
+        <div>
+            <h3 className="font-semibold text-lg flex items-center gap-2"><Settings />Application Settings</h3>
+            <div className="flex items-center space-x-2 mt-2">
+                {loading ? <Skeleton className="h-6 w-12" /> : <Switch id="student-editing" checked={allowStudentEditing} onCheckedChange={handleToggle} />}
+                <div className="flex flex-col">
+                    <Label htmlFor="student-editing">Allow Student Profile Editing</Label>
+                    <p className="text-sm text-muted-foreground">
+                        If enabled, students will be able to edit their own profile details from their dashboard.
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 export default function AdminDashboard({ user }) {
@@ -312,6 +371,9 @@ export default function AdminDashboard({ user }) {
                 </div>
                 <div className="md:col-span-2">
                     <BulkUploadCard />
+                </div>
+                 <div className="md:col-span-2">
+                    <AppSettingsCard />
                 </div>
            </div>
         </CardContent>

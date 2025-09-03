@@ -3,15 +3,18 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
-import { BookOpen, CalendarCheck, User, Percent } from "lucide-react";
+import { BookOpen, CalendarCheck, User, Percent, Edit } from "lucide-react";
 import { db } from "../../lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { useToast } from "../../hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Skeleton } from "../ui/skeleton";
+import { useAuth } from "../auth/auth-provider";
+import { Button } from "../ui/button";
+import EditStudentDialog from "./edit-student-dialog";
 
 
 function SubjectDetailsDialog({ subjects, children }) {
@@ -52,9 +55,11 @@ function SubjectDetailsDialog({ subjects, children }) {
 }
 
 
-export default function StudentDashboard({ user }) {
+export default function StudentDashboard({ user: initialUser }) {
+  const { user, setUser } = useAuth(); // Use setUser from AuthContext to update global state
   const [dashboardData, setDashboardData] = useState({ totalSubjects: 0, attendancePercent: 0, subjectDetails: [], chartData: [] });
   const [loading, setLoading] = useState(true);
+  const [allowEditing, setAllowEditing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -63,6 +68,13 @@ export default function StudentDashboard({ user }) {
       
       setLoading(true);
       try {
+        // 0. Fetch settings
+        const settingsRef = doc(db, "settings", "config");
+        const settingsSnap = await getDoc(settingsRef);
+        if (settingsSnap.exists()) {
+            setAllowEditing(settingsSnap.data().allowStudentProfileEditing);
+        }
+
         // 1. Fetch all staff members to create a map of ID -> Name
         const staffQuery = query(collection(db, "users"), where("role", "==", "staff"));
         const staffSnapshot = await getDocs(staffQuery);
@@ -133,6 +145,10 @@ export default function StudentDashboard({ user }) {
 
     fetchData();
   }, [user, toast]);
+
+  const handleStudentUpdated = (updatedStudentData) => {
+      setUser(updatedStudentData); // Update the user in the global auth context
+  };
   
   const attendanceChartColors = {
       Present: 'hsl(var(--primary))',
@@ -271,10 +287,15 @@ export default function StudentDashboard({ user }) {
 
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row justify-between items-center">
             <CardTitle className="flex items-center gap-2">
                 <User /> My Information
             </CardTitle>
+            {allowEditing && (
+                <EditStudentDialog student={user} onStudentUpdated={handleStudentUpdated}>
+                    <Button variant="outline"><Edit className="mr-2"/>Edit My Profile</Button>
+                </EditStudentDialog>
+            )}
         </CardHeader>
         <CardContent>
             <Tabs defaultValue="personal">
@@ -288,7 +309,7 @@ export default function StudentDashboard({ user }) {
                         <span className="hidden sm:inline">Contact Details</span>
                     </TabsTrigger>
                     <TabsTrigger value="academics">
-                        <span className="sm:hidden">Academics</span>
+                        <span className="smhidden">Academics</span>
                         <span className="hidden sm:inline">Academic Details</span>
                     </TabsTrigger>
                 </TabsList>
@@ -297,26 +318,26 @@ export default function StudentDashboard({ user }) {
                     <DetailRow label="Enrollment Number" value={user.enrollment_number} />
                     <DetailRow label="Date of Birth" value={user.dob} />
                     <DetailRow label="Gender" value={user.gender} />
-                    <DetailRow label="Blood Group" value={user.bloodGroup} />
-                    <DetailRow label="Aadhar Number" value={user.aadhar} />
+                    <DetailRow label="Blood Group" value={user.details?.bloodGroup} />
+                    <DetailRow label="Aadhar Number" value={user.details?.aadhar} />
                 </TabsContent>
                  <TabsContent value="contact" className="mt-4">
                     <DetailRow label="Email" value={user.email} />
                     <DetailRow label="Mobile" value={user.phone} />
-                    <DetailRow label="Permanent Address" value={user.permanentAddress} />
-                    <DetailRow label="Father's Name" value={user.fatherName} />
-                    <DetailRow label="Father's Mobile" value={user.fatherMobile} />
-                    <DetailRow label="Mother's Name" value={user.motherName} />
+                    <DetailRow label="Permanent Address" value={user.details?.permanentAddress} />
+                    <DetailRow label="Father's Name" value={user.details?.fatherName} />
+                    <DetailRow label="Father's Mobile" value={user.details?.fatherMobile} />
+                    <DetailRow label="Mother's Name" value={user.details?.motherName} />
                 </TabsContent>
                  <TabsContent value="academics" className="mt-4">
-                    <DetailRow label="Program" value={user.program} />
+                    <DetailRow label="Program" value={user.details?.program} />
                     <DetailRow label="Department" value={user.department} />
-                    <DetailRow label="Admission Year" value={user.admissionYear} />
+                    <DetailRow label="Admission Year" value={user.details?.admissionYear} />
                     <DetailRow label="Current Class" value={user.class} />
-                    <DetailRow label="10th Board" value={user.tenthBoard} />
-                    <DetailRow label="10th Percentage" value={`${user.tenthPercentage}%`} />
-                    <DetailRow label="12th Board" value={user.twelfthBoard} />
-                    <DetailRow label="12th Percentage" value={`${user.twelfthPercentage}%`} />
+                    <DetailRow label="10th Board" value={user.details?.tenthBoard} />
+                    <DetailRow label="10th Percentage" value={`${user.details?.tenthPercentage}%`} />
+                    <DetailRow label="12th Board" value={user.details?.twelfthBoard} />
+                    <DetailRow label="12th Percentage" value={`${user.details?.twelfthPercentage}%`} />
                 </TabsContent>
             </Tabs>
         </CardContent>
