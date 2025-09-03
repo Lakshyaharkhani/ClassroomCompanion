@@ -13,7 +13,7 @@ import { useToast } from "../../hooks/use-toast";
 export default function LoginPage({ onLogin }) {
   const [role, setRole] = useState("student");
   const [email, setEmail] = useState("student0@example.com");
-  const [password, setPassword] = useState("password123");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const { resetPassword } = useAuth();
   const { toast } = useToast();
@@ -33,7 +33,7 @@ export default function LoginPage({ onLogin }) {
     } else {
       setEmail('student0@example.com');
     }
-    setPassword("password123");
+    setPassword("");
   }
 
   const handlePasswordReset = async () => {

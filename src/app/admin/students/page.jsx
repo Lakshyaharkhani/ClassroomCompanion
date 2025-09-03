@@ -18,6 +18,7 @@ import { ScrollArea } from "../../../components/ui/scroll-area";
 import { useToast } from "../../../hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../../../components/ui/alert-dialog";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { Skeleton } from "../../../components/ui/skeleton";
 
 
 function StudentDetailsCard({ student, onBack }) {
@@ -86,6 +87,13 @@ function StudentDetailsCard({ student, onBack }) {
             <p className="text-sm font-medium text-right">{value || 'N/A'}</p>
         </div>
     );
+    
+    const SkeletonDetailRow = () => (
+         <div className="flex justify-between py-2 border-b">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-32" />
+        </div>
+    )
 
     return (
         <Card>
@@ -99,62 +107,94 @@ function StudentDetailsCard({ student, onBack }) {
                 <CardDescription>Viewing details for the selected student.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                {loading ? <p>Loading details...</p> : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="md:col-span-1 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="md:col-span-1 space-y-4">
+                        <Card>
+                            <CardHeader><CardTitle className="text-base flex items-center gap-2"><User />Personal Info</CardTitle></CardHeader>
+                            <CardContent>
+                                {loading ? (
+                                    <div className="space-y-2">
+                                        <SkeletonDetailRow />
+                                        <SkeletonDetailRow />
+                                        <SkeletonDetailRow />
+                                        <SkeletonDetailRow />
+                                    </div>
+                                ) : (
+                                    <>
+                                        <DetailRow label="Email" value={student.email} />
+                                        <DetailRow label="Phone" value={student.phone} />
+                                        <DetailRow label="Gender" value={student.gender} />
+                                        <DetailRow label="Date of Birth" value={student.dob} />
+                                    </>
+                                )}
+                            </CardContent>
+                        </Card>
                             <Card>
-                                <CardHeader><CardTitle className="text-base flex items-center gap-2"><User />Personal Info</CardTitle></CardHeader>
-                                <CardContent>
-                                    <DetailRow label="Email" value={student.email} />
-                                    <DetailRow label="Phone" value={student.phone} />
-                                    <DetailRow label="Gender" value={student.gender} />
-                                    <DetailRow label="Date of Birth" value={student.dob} />
-                                </CardContent>
-                            </Card>
-                             <Card>
-                                <CardHeader><CardTitle className="text-base flex items-center gap-2"><BookOpen />Academic Info</CardTitle></CardHeader>
-                                <CardContent>
+                            <CardHeader><CardTitle className="text-base flex items-center gap-2"><BookOpen />Academic Info</CardTitle></CardHeader>
+                            <CardContent>
+                                {loading ? (
+                                    <div className="space-y-2">
+                                        <SkeletonDetailRow />
+                                        <SkeletonDetailRow />
+                                        <SkeletonDetailRow />
+                                    </div>
+                                ) : (
+                                   <>
                                     <DetailRow label="Program" value={student.details?.program} />
                                     <DetailRow label="Department" value={student.department} />
                                     <DetailRow label="Admission Year" value={student.details?.admissionYear} />
-                                </CardContent>
-                            </Card>
-                        </div>
-                        <div className="md:col-span-2 space-y-6">
+                                   </>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                    <div className="md:col-span-2 space-y-6">
+                        <Card>
+                            <CardHeader><CardTitle className="text-base flex items-center gap-2"><Percent/>Attendance</CardTitle></CardHeader>
+                            <CardContent className="flex flex-col md:flex-row items-center gap-4">
+                                    <div className="w-full md:w-1/2 h-40">
+                                        {loading ? <Skeleton className="w-40 h-40 rounded-full mx-auto"/> : (
+                                        details.attendance.total > 0 ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
+                                                        {chartData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={chartColors[entry.name]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip />
+                                                <Legend />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        ) : <p className="text-muted-foreground text-center w-full">No attendance data found.</p>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 grid grid-cols-2 gap-4 w-full">
+                                        {loading ? (
+                                            <>
+                                                <Skeleton className="h-20 w-full" />
+                                                <Skeleton className="h-20 w-full" />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="text-center p-4 rounded-lg bg-muted">
+                                                    <p className="text-2xl font-bold">{attendancePercentage}%</p>
+                                                    <p className="text-xs text-muted-foreground">Overall</p>
+                                                </div>
+                                                <div className="text-center p-4 rounded-lg bg-muted">
+                                                    <p className="text-2xl font-bold">{details.attendance.present} / {details.attendance.total}</p>
+                                                    <p className="text-xs text-muted-foreground">Present / Total</p>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                            </CardContent>
+                        </Card>
                             <Card>
-                                <CardHeader><CardTitle className="text-base flex items-center gap-2"><Percent/>Attendance</CardTitle></CardHeader>
-                                <CardContent className="flex flex-col md:flex-row items-center gap-4">
-                                     <div className="w-full md:w-1/2 h-40">
-                                         {details.attendance.total > 0 ? (
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
-                                                         {chartData.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={chartColors[entry.name]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip />
-                                                    <Legend />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                         ) : <p className="text-muted-foreground text-center w-full">No attendance data found.</p>}
-                                     </div>
-                                     <div className="flex-1 grid grid-cols-2 gap-4">
-                                         <div className="text-center p-4 rounded-lg bg-muted">
-                                             <p className="text-2xl font-bold">{attendancePercentage}%</p>
-                                             <p className="text-xs text-muted-foreground">Overall</p>
-                                         </div>
-                                         <div className="text-center p-4 rounded-lg bg-muted">
-                                             <p className="text-2xl font-bold">{details.attendance.present} / {details.attendance.total}</p>
-                                             <p className="text-xs text-muted-foreground">Present / Total</p>
-                                         </div>
-                                     </div>
-                                </CardContent>
-                            </Card>
-                             <Card>
-                                <CardHeader><CardTitle className="text-base">Enrolled Classes</CardTitle></CardHeader>
-                                <CardContent>
-                                    {details.classes.length > 0 ? (
+                            <CardHeader><CardTitle className="text-base">Enrolled Classes</CardTitle></CardHeader>
+                            <CardContent>
+                                {loading ? <Skeleton className="h-32 w-full" /> : (
+                                    details.classes.length > 0 ? (
                                         <Table>
                                             <TableHeader><TableRow><TableHead>Class Name</TableHead><TableHead>Department</TableHead></TableRow></TableHeader>
                                             <TableBody>
@@ -166,12 +206,12 @@ function StudentDetailsCard({ student, onBack }) {
                                                 ))}
                                             </TableBody>
                                         </Table>
-                                    ) : <p className="text-muted-foreground text-center">Not enrolled in any classes.</p>}
-                                </CardContent>
-                            </Card>
-                        </div>
+                                    ) : <p className="text-muted-foreground text-center">Not enrolled in any classes.</p>
+                                )}
+                            </CardContent>
+                        </Card>
                     </div>
-                )}
+                </div>
             </CardContent>
         </Card>
     )
@@ -620,5 +660,3 @@ export default function StudentManagementPage() {
     </div>
   );
 }
-
-    
