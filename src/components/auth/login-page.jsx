@@ -20,15 +20,13 @@ export default function LoginPage({ onLogin }) {
 
   const handleLogin = () => {
     if (email.trim() && password.trim()) {
-      onLogin({ email: email.trim(), role, password });
+      onLogin({ email: email.trim(), password });
     }
   };
 
   const handleRoleChange = (newRole) => {
     setRole(newRole);
-    if (newRole === 'admin') {
-      setEmail('admin@example.com');
-    } else if (newRole === 'staff') {
+    if (newRole === 'staff') {
       setEmail('staff0@example.com');
     } else {
       setEmail('student0@example.com');
@@ -78,7 +76,7 @@ export default function LoginPage({ onLogin }) {
           <div className="space-y-2">
              <Label>Role</Label>
             <div className="flex gap-2">
-              {(["student", "staff", "admin"]).map((r) => (
+              {(["student", "staff"]).map((r) => (
                 <Button
                   key={r}
                   variant={role === r ? "default" : "outline"}
