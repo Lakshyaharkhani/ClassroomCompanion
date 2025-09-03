@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { Skeleton } from "../ui/skeleton";
 
 
 function SubjectDetailsDialog({ subjects, children }) {
@@ -138,6 +139,36 @@ export default function StudentDashboard({ user }) {
       Absent: 'hsl(var(--destructive))'
   };
 
+  const StatCard = ({ title, value, icon, description, loading, actionWrapper: ActionWrapper, actionProps }) => {
+    const content = (
+      <Card className={ActionWrapper ? "cursor-pointer hover:border-primary transition-colors" : ""}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          {icon}
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-3 w-36" />
+            </div>
+          ) : (
+            <>
+              <div className="text-2xl font-bold">{value}</div>
+              <p className="text-xs text-muted-foreground">{description}</p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    );
+  
+    if (ActionWrapper) {
+      return <ActionWrapper {...actionProps}>{content}</ActionWrapper>;
+    }
+  
+    return content;
+  };
+
 
   const DetailRow = ({ label, value }) => (
     <div className="flex justify-between py-2 border-b border-muted/50">
@@ -146,61 +177,47 @@ export default function StudentDashboard({ user }) {
     </div>
   )
 
-  if (loading) {
-      return (
-          <div className="space-y-6">
-              <h1 className="text-3xl font-bold">Student Dashboard</h1>
-              <p className="text-muted-foreground">Welcome, {user.name} ({user.enrollment_number}).</p>
-               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    <Card><CardHeader><CardTitle>Loading...</CardTitle></CardHeader><CardContent><div className="h-8 w-16 bg-muted animate-pulse rounded-md" /></CardContent></Card>
-                    <Card><CardHeader><CardTitle>Loading...</CardTitle></CardHeader><CardContent><div className="h-8 w-16 bg-muted animate-pulse rounded-md" /></CardContent></Card>
-               </div>
-          </div>
-      )
-  }
-
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Student Dashboard</h1>
-      <p className="text-muted-foreground">Welcome, {user.name} ({user.enrollment_number}).</p>
+       {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-4 w-80" />
+        </div>
+      ) : (
+        <div>
+          <h1 className="text-3xl font-bold">Student Dashboard</h1>
+          <p className="text-muted-foreground">Welcome, {user.name} ({user.enrollment_number}).</p>
+        </div>
+      )}
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <SubjectDetailsDialog subjects={dashboardData.subjectDetails}>
-            <Card className="cursor-pointer hover:border-primary transition-colors">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Enrolled Subjects</CardTitle>
-                    <BookOpen className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{dashboardData.totalSubjects}</div>
-                    <p className="text-xs text-muted-foreground">Click to view details</p>
-                </CardContent>
-            </Card>
-        </SubjectDetailsDialog>
+        <StatCard
+          title="Enrolled Subjects"
+          value={dashboardData.totalSubjects}
+          icon={<BookOpen className="h-4 w-4 text-muted-foreground" />}
+          description="Click to view details"
+          loading={loading}
+          actionWrapper={SubjectDetailsDialog}
+          actionProps={{ subjects: dashboardData.subjectDetails }}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overall Attendance</CardTitle>
-            <Percent className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardData.attendancePercent}%</div>
-            <p className="text-xs text-muted-foreground">Across all subjects</p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Overall Attendance"
+          value={`${dashboardData.attendancePercent}%`}
+          icon={<Percent className="h-4 w-4 text-muted-foreground" />}
+          description="Across all subjects"
+          loading={loading}
+        />
 
-        <a href="/student/attendance">
-         <Card className="cursor-pointer hover:border-primary transition-colors">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Attendance Calendar</CardTitle>
-            <CalendarCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-             <div className="text-2xl font-bold">View History</div>
-             <p className="text-xs text-muted-foreground">See a day-by-day record</p>
-          </CardContent>
-        </Card>
-        </a>
+        <StatCard
+          title="Attendance Calendar"
+          value="View History"
+          icon={<CalendarCheck className="h-4 w-4 text-muted-foreground" />}
+          description="See a day-by-day record"
+          loading={loading}
+          actionWrapper={({ children }) => <a href="/student/attendance">{children}</a>}
+        />
       </div>
 
        <Card>
@@ -208,7 +225,11 @@ export default function StudentDashboard({ user }) {
           <CardTitle>Attendance Overview</CardTitle>
         </CardHeader>
         <CardContent>
-          {dashboardData.chartData.reduce((sum, item) => sum + item.value, 0) > 0 ? (
+          {loading ? (
+            <div className="flex justify-center items-center h-[250px]">
+              <Skeleton className="h-48 w-48 rounded-full" />
+            </div>
+          ) : dashboardData.chartData.reduce((sum, item) => sum + item.value, 0) > 0 ? (
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
@@ -303,4 +324,3 @@ export default function StudentDashboard({ user }) {
     </div>
   );
 }
-

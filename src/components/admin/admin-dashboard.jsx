@@ -12,6 +12,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { Skeleton } from "../ui/skeleton";
 
 
 function AddAdminDialog() {
@@ -149,11 +150,16 @@ export default function AdminDashboard({ user }) {
       </CardHeader>
       <CardContent>
         {loading ? (
-            <div className="h-8 w-16 bg-muted animate-pulse rounded-md" />
+           <div className="space-y-2">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-3 w-36" />
+           </div>
         ) : (
+          <>
             <div className="text-2xl font-bold">{value}</div>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </>
         )}
-        <p className="text-xs text-muted-foreground">{description}</p>
       </CardContent>
     </Card>
   )

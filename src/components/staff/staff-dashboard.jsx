@@ -9,6 +9,7 @@ import { collection, query, where, getDocs, Timestamp } from "firebase/firestore
 import { useToast } from "../../hooks/use-toast";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Skeleton } from "../ui/skeleton";
 
 
 export default function StaffDashboard({ user }) {
@@ -78,11 +79,16 @@ export default function StaffDashboard({ user }) {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-8 w-16 bg-muted animate-pulse rounded-md" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-3 w-36" />
+          </div>
         ) : (
-          <div className="text-2xl font-bold">{value}</div>
+          <>
+            <div className="text-2xl font-bold">{value}</div>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </>
         )}
-        <p className="text-xs text-muted-foreground">{description}</p>
       </CardContent>
     </Card>
   );
