@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "../components/ui/toaster.jsx";
 import { cn } from "../lib/utils.js";
 import { AuthProvider } from "../components/auth/auth-provider.jsx";
+import { AppProgressBar as ProgressBar } from 'next-nprogress-bar';
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -34,6 +35,12 @@ export default function RootLayout({
             {children}
         </AuthProvider>
         <Toaster />
+        <ProgressBar
+          height="4px"
+          color="hsl(var(--primary))"
+          options={{ showSpinner: false }}
+          shallowRouting
+        />
       </body>
     </html>
   );
