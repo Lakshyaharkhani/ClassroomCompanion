@@ -3,11 +3,12 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 export const firebaseConfig = {
   "projectId": "classroom-companion-vvcmc",
   "appId": "1:275727972469:web:4a8d25b74554b3824be03c",
-  "storageBucket": "classroom-companion-vvcmc.firebasestorage.app",
+  "storageBucket": "classroom-companion-vvcmc.appspot.com",
   "apiKey": "AIzaSyDK1j7KMlWewz0Xx3KE6XtXGzaUXV7-7KU",
   "authDomain": "classroom-companion-vvcmc.firebaseapp.com",
   "measurementId": "",
@@ -18,3 +19,4 @@ export const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);

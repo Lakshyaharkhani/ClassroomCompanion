@@ -3,8 +3,9 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "../../../components/auth/auth-provider";
-import { db } from "../../../lib/firebase";
+import { db, storage } from "../../../lib/firebase";
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from "../../../hooks/use-toast";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
@@ -13,38 +14,78 @@ import { Label } from "../../../components/ui/label";
 import { RadioGroup, RadioGroupItem } from "../../../components/ui/radio-group";
 import { Textarea } from "../../../components/ui/textarea";
 import { Badge } from "../../../components/ui/badge";
+import { Input } from "../../../components/ui/input";
+import { Paperclip, Upload } from "lucide-react";
+
 
 function AssignmentView({ assignment, studentId, onSubmission }) {
     const { toast } = useToast();
     const [answers, setAnswers] = useState({});
+    const [file, setFile] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleAnswerChange = (qIndex, value) => {
         setAnswers(prev => ({ ...prev, [qIndex]: value }));
     };
 
+    const handleFileChange = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile) {
+            const settings = assignment.fileSubmission;
+            if (selectedFile.size > settings.maxSizeMB * 1024 * 1024) {
+                 toast({ variant: "destructive", title: "File too large", description: `The maximum file size is ${settings.maxSizeMB}MB.`});
+                 e.target.value = null; // Clear the input
+                 return;
+            }
+            if (!selectedFile.name.endsWith(`.${settings.allowedType}`)) {
+                 toast({ variant: "destructive", title: "Invalid file type", description: `Only .${settings.allowedType.toUpperCase()} files are allowed.`});
+                 e.target.value = null; // Clear the input
+                 return;
+            }
+            setFile(selectedFile);
+        }
+    };
+
     const handleSubmit = async () => {
-        const submission = {
-            assignmentId: assignment.id,
-            studentId: studentId,
-            submittedAt: serverTimestamp(),
-            answers: assignment.questions.map((q, i) => ({
-                questionText: q.text,
-                answer: answers[i] || ""
-            })),
-            graded: false,
-        };
+        setIsSubmitting(true);
+        let fileUrl = "";
 
         try {
+            // 1. Upload file if it exists
+            if (file) {
+                const storageRef = ref(storage, `submissions/${assignment.id}/${studentId}/${file.name}`);
+                const uploadResult = await uploadBytes(storageRef, file);
+                fileUrl = await getDownloadURL(uploadResult.ref);
+            }
+
+            // 2. Prepare submission document
+            const submission = {
+                assignmentId: assignment.id,
+                studentId: studentId,
+                submittedAt: serverTimestamp(),
+                answers: assignment.questions.map((q, i) => ({
+                    questionText: q.text,
+                    answer: answers[i] || ""
+                })),
+                fileUrl: fileUrl,
+                graded: false,
+            };
+
+            // 3. Save to Firestore
             await addDoc(collection(db, "submissions"), submission);
             toast({ title: "Success", description: "Your assignment has been submitted." });
             onSubmission(assignment.id);
+
         } catch (error) {
             console.error("Error submitting assignment: ", error);
             toast({ variant: "destructive", title: "Error", description: "Could not submit your assignment." });
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const allQuestionsAnswered = assignment.questions.every((_, i) => answers[i] && answers[i].trim() !== "");
+    const canSubmit = allQuestionsAnswered && (assignment.fileSubmission.required ? file : true);
 
     return (
         <Card>
@@ -74,9 +115,22 @@ function AssignmentView({ assignment, studentId, onSubmission }) {
                         )}
                     </div>
                 ))}
+
+                {assignment.fileSubmission?.required && (
+                    <div className="p-4 border rounded-lg space-y-2">
+                        <Label className="font-semibold flex items-center gap-2"><Paperclip /> File Submission</Label>
+                        <p className="text-sm text-muted-foreground">
+                            Please upload a single <strong>.{assignment.fileSubmission.allowedType.toUpperCase()}</strong> file. 
+                            Maximum size: <strong>{assignment.fileSubmission.maxSizeMB}MB</strong>.
+                        </p>
+                        <Input type="file" onChange={handleFileChange} />
+                    </div>
+                )}
             </CardContent>
             <CardFooter>
-                <Button onClick={handleSubmit} disabled={!allQuestionsAnswered}>Submit Assignment</Button>
+                <Button onClick={handleSubmit} disabled={!canSubmit || isSubmitting}>
+                    {isSubmitting ? "Submitting..." : "Submit Assignment"}
+                </Button>
             </CardFooter>
         </Card>
     )
