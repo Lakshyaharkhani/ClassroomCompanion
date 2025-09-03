@@ -9,13 +9,18 @@ import { Badge } from "../../../components/ui/badge";
 import { db } from "../../../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { useToast } from "../../../hooks/use-toast";
+import { format, isSameDay } from "date-fns";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/ui/table";
+import { Skeleton } from "../../../components/ui/skeleton";
 
 
 export default function StudentAttendancePage() {
     const { user } = useAuth();
     const { toast } = useToast();
     const [attendanceData, setAttendanceData] = useState({ overall: 0, present: 0, total: 0 });
-    const [attendedDates, setAttendedDates] = useState([]);
+    const [allRecords, setAllRecords] = useState([]);
+    const [selectedDay, setSelectedDay] = useState(null);
+    const [dayDetails, setDayDetails] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -25,11 +30,28 @@ export default function StudentAttendancePage() {
             setIsLoading(true);
 
             try {
-                // Find what classes the student is in from the 'users' collection
+                // Fetch all staff to map IDs to names later
+                const staffQuery = query(collection(db, "users"), where("role", "==", "staff"));
+                const staffSnapshot = await getDocs(staffQuery);
+                const staffMap = staffSnapshot.docs.reduce((acc, doc) => {
+                    const data = doc.data();
+                    acc[data.staff_id] = data.name;
+                    return acc;
+                }, {});
+
+                // Find what classes the student is in
                 const studentClassesQuery = query(collection(db, "classes"), where("students", "array-contains", user.enrollment_number));
                 const studentClassesSnapshot = await getDocs(studentClassesQuery);
-                const studentClassIds = studentClassesSnapshot.docs.map(doc => doc.data().class_id);
-
+                const classDetailsMap = {};
+                studentClassesSnapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    classDetailsMap[data.class_id] = {
+                        className: data.class_name,
+                        subjects: data.subjects
+                    };
+                });
+                const studentClassIds = Object.keys(classDetailsMap);
+                
                 if (studentClassIds.length === 0) {
                     setIsLoading(false);
                     return;
@@ -41,7 +63,7 @@ export default function StudentAttendancePage() {
 
                 let totalLectures = 0;
                 let presentLectures = 0;
-                const dateRecords = [];
+                const processedRecords = [];
 
                 attendanceSnapshot.forEach(doc => {
                     const record = doc.data();
@@ -52,11 +74,22 @@ export default function StudentAttendancePage() {
                         if (studentStatus === true) {
                             presentLectures++;
                         }
-                        dateRecords.push({ date: new Date(record.date), status: studentStatus });
+                        const classInfo = classDetailsMap[record.class_id];
+                        // Here we are just picking a subject from the class.
+                        // A more robust system would link attendance to a specific subject/period.
+                        const subjectInfo = classInfo?.subjects?.[0] || { subjectName: "N/A", staffId: "N/A"};
+
+                        processedRecords.push({ 
+                            date: new Date(record.date),
+                            status: studentStatus,
+                            className: classInfo?.className || "Unknown Class",
+                            subjectName: subjectInfo.subjectName,
+                            staffName: staffMap[subjectInfo.staffId] || "Unknown Staff"
+                        });
                     }
                 });
 
-                setAttendedDates(dateRecords);
+                setAllRecords(processedRecords);
                 
                 if(totalLectures > 0) {
                     setAttendanceData({
@@ -76,10 +109,24 @@ export default function StudentAttendancePage() {
 
         fetchAttendance();
     }, [user, toast]);
-      
+    
+    const handleDayClick = (day) => {
+      setSelectedDay(day);
+      const detailsForDay = allRecords
+        .filter(rec => isSameDay(rec.date, day))
+        .map((rec, index) => {
+            const times = ["7:30 AM - 8:25 AM", "9:30 AM - 10:25 AM", "10:25 AM - 11:20 AM", "12:20 PM - 2:10 PM"];
+            return {
+                ...rec,
+                time: times[index % times.length] // Mock time
+            }
+        });
+      setDayDetails(detailsForDay);
+    };
+
     const modifiers = {
-        present: attendedDates.filter(d => d.status === true).map(d => d.date),
-        absent: attendedDates.filter(d => d.status === false).map(d => d.date),
+        present: allRecords.filter(d => d.status === true).map(d => d.date),
+        absent: allRecords.filter(d => d.status === false).map(d => d.date),
     };
 
     const modifiersStyles = {
@@ -97,7 +144,17 @@ export default function StudentAttendancePage() {
     };
 
     if (isLoading) {
-        return <div>Loading attendance...</div>;
+        return (
+            <div className="space-y-6">
+                <Skeleton className="h-9 w-64" />
+                <div className="grid gap-6 md:grid-cols-3">
+                    <Skeleton className="h-32" />
+                    <Skeleton className="h-32" />
+                    <Skeleton className="h-32" />
+                </div>
+                <Skeleton className="h-96" />
+            </div>
+        );
     }
 
 
@@ -137,12 +194,13 @@ export default function StudentAttendancePage() {
             
             <Card>
                 <CardHeader>
-                    <CardTitle>Attendance History</CardTitle>
+                    <CardTitle>Attendance History Calendar</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center">
                     <Calendar
-                        mode="multiple"
-                        selected={attendedDates.map(d => d.date)}
+                        mode="single"
+                        onDayClick={handleDayClick}
+                        selected={selectedDay}
                         modifiers={modifiers}
                         modifiersStyles={modifiersStyles}
                         className="rounded-md border p-4"
@@ -154,7 +212,48 @@ export default function StudentAttendancePage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {selectedDay && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Attendance Detail for {format(selectedDay, "PPP")}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {dayDetails.length > 0 ? (
+                             <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Sr.</TableHead>
+                                        <TableHead>Time</TableHead>
+                                        <TableHead>Subject</TableHead>
+                                        <TableHead>Staff</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {dayDetails.map((detail, index) => (
+                                        <TableRow key={index}>
+                                            <TableCell>{index + 1}</TableCell>
+                                            <TableCell>{detail.time}</TableCell>
+                                            <TableCell>{detail.subjectName}</TableCell>
+                                            <TableCell>{detail.staffName}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={detail.status ? "default" : "destructive"}>
+                                                    {detail.status ? "Present" : "Absent"}
+                                                </Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <p className="text-muted-foreground text-center py-4">
+                                No attendance records found for this day.
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }
-
