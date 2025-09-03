@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from "react";
@@ -28,9 +29,13 @@ export default function SmartCurriculumApp() {
     try {
         const loggedInUser = await login(loginInfo.email, loginInfo.password);
         let initialPath = '/';
-        if (loggedInUser.role === 'admin') initialPath = '/admin/dashboard';
-        if (loggedInUser.role === 'staff') initialPath = '/staff/dashboard';
-        if (loggedInUser.role === 'student') initialPath = '/student/dashboard';
+        if (loggedInUser.role === 'admin') {
+            initialPath = '/admin/dashboard';
+        } else if (loggedInUser.role === 'staff') {
+            initialPath = '/staff/dashboard';
+        } else if (loggedInUser.role === 'student') {
+            initialPath = '/student/dashboard';
+        }
         router.push(initialPath);
     } catch(error) {
         console.error("Login failed:", error);

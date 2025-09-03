@@ -61,6 +61,64 @@ export async function createAdminUser(userData) {
     }
 }
 
+export async function bulkCreateStudentUsers(students) {
+    const app = await initializeAdminApp();
+    const auth = getAuth(app);
+    let createdCount = 0;
+    const errors = [];
+
+    for (const studentData of students) {
+        const { studentName, email, password, program, ...details } = studentData;
+        if (!email || !password || !studentName) {
+            errors.push({ email: email || "N/A", reason: "Missing required fields (email, password, studentName)." });
+            continue;
+        }
+
+        try {
+            // Step 1: Create user in Firebase Authentication
+            await auth.createUser({
+                email,
+                password,
+                displayName: studentName,
+            });
+
+            // Step 2: Create user document in Firestore
+            const year = details.admissionYear || new Date().getFullYear();
+            const departmentCode = (program || "GEN").substring(0,2).toUpperCase();
+
+            const newStudent = {
+                enrollment_number: `${year}${departmentCode}${uid().substring(0,3).toUpperCase()}`,
+                name: studentName,
+                email: email,
+                role: 'student',
+                department: program || 'N/A',
+                class: '', // Can be assigned later
+                phone: details.mobile || '',
+                dob: details.dob || '',
+                gender: details.gender || '',
+                details: { ...details, program, studentName, email }
+            };
+            
+            const docId = email.replace(/[^a-zA-Z0-9]/g, "");
+            await setDoc(doc(db, "users", docId), newStudent);
+
+            createdCount++;
+
+        } catch (error) {
+            let reason = "An unexpected error occurred.";
+            if (error.code === 'auth/email-already-exists') {
+                reason = "Email address is already in use.";
+            } else if (error.code === 'auth/invalid-password') {
+                reason = "Password is not strong enough (min. 6 characters).";
+            }
+             console.error(`Failed to create user ${email}:`, error);
+            errors.push({ email, reason });
+        }
+    }
+
+    return { success: true, createdCount, errors };
+}
+
 export async function createStaffUser(formData) {
     try {
         const app = await initializeAdminApp();
@@ -114,7 +172,7 @@ export async function seedDatabase() {
         // Seed Users (Students, Staff, Admin)
         const allUsers = [...seedStudents, ...seedStaff, seedAdmin];
         allUsers.forEach(user => {
-            const docId = user.email.replace(/[^a-zA-Z0-9]/g, "");
+            const docId = user.email.replace(/[^a-zA-Z0-g]/g, "");
             const userRef = doc(db, "users", docId);
             batch.set(userRef, user);
         });

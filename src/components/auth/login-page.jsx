@@ -13,27 +13,25 @@ import { useToast } from "../../hooks/use-toast";
 export default function LoginPage({ onLogin }) {
   const [role, setRole] = useState("student");
   const [email, setEmail] = useState("student0@example.com");
-  const [password, setPassword] = useState("password123");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const { resetPassword } = useAuth();
   const { toast } = useToast();
 
   const handleLogin = () => {
     if (email.trim() && password.trim()) {
-      onLogin({ email: email.trim(), role, password });
+      onLogin({ email: email.trim(), password });
     }
   };
 
   const handleRoleChange = (newRole) => {
     setRole(newRole);
-    if (newRole === 'admin') {
-      setEmail('admin@example.com');
-    } else if (newRole === 'staff') {
+    if (newRole === 'staff') {
       setEmail('staff0@example.com');
     } else {
       setEmail('student0@example.com');
     }
-    setPassword("password123");
+    setPassword("");
   }
 
   const handlePasswordReset = async () => {
@@ -64,7 +62,7 @@ export default function LoginPage({ onLogin }) {
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
   return (
-    <div className="flex flex-col justify-center items-center min-h-screen bg-background">
+    <div className="flex flex-col justify-center items-center min-h-screen bg-background px-4">
        <div className="container absolute top-0 left-0 right-0 flex items-center gap-3 p-6">
          <GraduationCap className="h-8 w-8 text-primary" />
          <span className="text-xl font-bold">Classroom Companion</span>
@@ -78,7 +76,7 @@ export default function LoginPage({ onLogin }) {
           <div className="space-y-2">
              <Label>Role</Label>
             <div className="flex gap-2">
-              {(["student", "staff", "admin"]).map((r) => (
+              {(["student", "staff"]).map((r) => (
                 <Button
                   key={r}
                   variant={role === r ? "default" : "outline"}

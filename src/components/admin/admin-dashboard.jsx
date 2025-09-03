@@ -3,15 +3,18 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../ui/card";
-import { Users, UserPlus, BookCopy, Database, ShieldPlus, UserCog } from "lucide-react";
+import { Users, UserPlus, BookCopy, Database, ShieldPlus, UserCog, Upload, Download, Settings, ToggleLeft, ToggleRight } from "lucide-react";
 import { Button } from "../ui/button";
-import { seedDatabase, createAdminUser } from "../../app/actions";
+import { seedDatabase, createAdminUser, bulkCreateStudentUsers } from "../../app/actions";
 import { useToast } from "../../hooks/use-toast";
 import { db } from "../../lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, getDoc, setDoc } from "firebase/firestore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { Skeleton } from "../ui/skeleton";
+import * as XLSX from 'xlsx';
+import { Switch } from "../ui/switch";
 
 
 function AddAdminDialog() {
@@ -79,6 +82,158 @@ function AddAdminDialog() {
             </DialogContent>
         </Dialog>
     )
+}
+
+function BulkUploadCard() {
+    const { toast } = useToast();
+    const [file, setFile] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
+
+    const handleFileChange = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile) {
+            setFile(selectedFile);
+        }
+    };
+
+    const handleUpload = async () => {
+        if (!file) {
+            toast({ variant: "destructive", title: "No file selected", description: "Please select an Excel file to upload." });
+            return;
+        }
+
+        setIsUploading(true);
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const studentsJson = XLSX.utils.sheet_to_json(worksheet);
+
+            if (studentsJson.length === 0) {
+                toast({ variant: "destructive", title: "Empty File", description: "The selected file contains no student data." });
+                setIsUploading(false);
+                return;
+            }
+
+            const result = await bulkCreateStudentUsers(studentsJson);
+            
+            if (result.success) {
+                toast({ title: "Upload Successful", description: `${result.createdCount} student(s) created successfully.` });
+                 if(result.errors.length > 0) {
+                    toast({
+                        variant: "destructive",
+                        title: "Some students failed to import",
+                        description: `${result.errors.length} student(s) could not be created. Check console for details.`,
+                        duration: 8000
+                    });
+                    console.error("Bulk upload errors:", result.errors);
+                }
+            } else {
+                toast({ variant: "destructive", title: "Upload Failed", description: result.message });
+            }
+            
+            setFile(null); // Reset file input
+            if(document.getElementById('student-upload-input')) {
+              document.getElementById('student-upload-input').value = '';
+            }
+            setIsUploading(false);
+        };
+        reader.readAsArrayBuffer(file);
+    };
+    
+    const downloadTemplate = () => {
+        const templateData = [
+            { 
+                studentName: "John Doe",
+                email: "john.doe@example.com",
+                password: "password123",
+                program: "BTech - CSE",
+                mobile: "1234567890",
+                dob: "2003-05-15",
+                gender: "Male"
+            }
+        ];
+        const worksheet = XLSX.utils.json_to_sheet(templateData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+        XLSX.writeFile(workbook, "student_upload_template.xlsx");
+    }
+
+    return (
+        <div>
+            <h3 className="font-semibold text-lg flex items-center gap-2"><Upload />Bulk Student Upload</h3>
+            <p className="text-sm text-muted-foreground mb-2">
+                Upload an Excel file (.xlsx) with new student data. Accounts will be created in both Authentication and the database.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+                 <Input id="student-upload-input" type="file" accept=".xlsx, .csv" onChange={handleFileChange} className="max-w-xs"/>
+                 <Button onClick={handleUpload} disabled={isUploading || !file}>
+                    {isUploading ? "Uploading..." : "Upload & Create Students"}
+                 </Button>
+                 <Button variant="outline" onClick={downloadTemplate}>
+                    <Download className="mr-2"/> Template
+                 </Button>
+            </div>
+        </div>
+    )
+}
+
+function AppSettingsCard() {
+    const { toast } = useToast();
+    const [allowStudentEditing, setAllowStudentEditing] = useState(false);
+    const [loading, setLoading] = useState(true);
+    
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const settingsRef = doc(db, "settings", "config");
+                const docSnap = await getDoc(settingsRef);
+                if (docSnap.exists()) {
+                    setAllowStudentEditing(docSnap.data().allowStudentProfileEditing);
+                } else {
+                    // If the document doesn't exist, create it with a default value
+                    await setDoc(settingsRef, { allowStudentProfileEditing: false });
+                    setAllowStudentEditing(false);
+                }
+            } catch (error) {
+                console.error("Error fetching settings:", error);
+                toast({ variant: "destructive", title: "Error", description: "Could not load app settings." });
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchSettings();
+    }, [toast]);
+    
+    const handleToggle = async (checked) => {
+        setAllowStudentEditing(checked);
+        try {
+            const settingsRef = doc(db, "settings", "config");
+            await setDoc(settingsRef, { allowStudentProfileEditing: checked }, { merge: true });
+            toast({ title: "Setting Updated", description: `Students are now ${checked ? 'allowed' : 'prevented from'} editing their profiles.` });
+        } catch (error) {
+            console.error("Error updating setting:", error);
+            toast({ variant: "destructive", title: "Error", description: "Could not update the setting." });
+            setAllowStudentEditing(!checked); // Revert on error
+        }
+    }
+
+    return (
+        <div>
+            <h3 className="font-semibold text-lg flex items-center gap-2"><Settings />Application Settings</h3>
+            <div className="flex items-center space-x-2 mt-2">
+                {loading ? <Skeleton className="h-6 w-12" /> : <Switch id="student-editing" checked={allowStudentEditing} onCheckedChange={handleToggle} />}
+                <div className="flex flex-col">
+                    <Label htmlFor="student-editing">Allow Student Profile Editing</Label>
+                    <p className="text-sm text-muted-foreground">
+                        If enabled, students will be able to edit their own profile details from their dashboard.
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 export default function AdminDashboard({ user }) {
@@ -149,11 +304,16 @@ export default function AdminDashboard({ user }) {
       </CardHeader>
       <CardContent>
         {loading ? (
-            <div className="h-8 w-16 bg-muted animate-pulse rounded-md" />
+           <div className="space-y-2">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-3 w-36" />
+           </div>
         ) : (
+          <>
             <div className="text-2xl font-bold">{value}</div>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </>
         )}
-        <p className="text-xs text-muted-foreground">{description}</p>
       </CardContent>
     </Card>
   )
@@ -191,8 +351,8 @@ export default function AdminDashboard({ user }) {
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-           <div className="grid md:grid-cols-2 gap-4">
+        <CardContent className="space-y-6">
+           <div className="grid md:grid-cols-2 gap-x-6 gap-y-8">
                 <div>
                     <h3 className="font-semibold text-lg flex items-center gap-2"><ShieldPlus/>Admin Management</h3>
                     <p className="text-sm text-muted-foreground mb-2">
@@ -208,6 +368,12 @@ export default function AdminDashboard({ user }) {
                      <Button onClick={handleSeedDatabase} disabled={isSeeding} variant="secondary">
                         {isSeeding ? "Seeding..." : "Seed Database"}
                     </Button>
+                </div>
+                <div className="md:col-span-2">
+                    <BulkUploadCard />
+                </div>
+                 <div className="md:col-span-2">
+                    <AppSettingsCard />
                 </div>
            </div>
         </CardContent>

@@ -23,7 +23,8 @@ export function AuthProvider({ children }) {
 
         if (!querySnapshot.empty) {
             const userDoc = querySnapshot.docs[0];
-            setUser({ uid: firebaseUser.uid, ...userDoc.data() });
+            // Pass the original doc ID to be able to update it later.
+            setUser({ uid: firebaseUser.uid, id: userDoc.id, ...userDoc.data() });
         } else {
             // This case might happen if a user exists in Auth but not in Firestore.
             // For this app's logic, we treat them as not fully logged in.
@@ -51,7 +52,7 @@ export function AuthProvider({ children }) {
 
         if (!querySnapshot.empty) {
             const userDoc = querySnapshot.docs[0];
-            const userData = { uid: firebaseUser.uid, ...userDoc.data() };
+            const userData = { uid: firebaseUser.uid, id: userDoc.id, ...userDoc.data() };
             setUser(userData);
             setLoading(false);
             return userData;
@@ -87,7 +88,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const value = { user, loading, login, logout, resetPassword };
+  const value = { user, setUser, loading, login, logout, resetPassword };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
