@@ -114,6 +114,7 @@ function ManageStudentsDialog({ classDetails, onStudentsUpdated, children }) {
     if (open) {
       setEnrolledStudentIds(classDetails.students || []);
     }
+    // Using a stable dependency instead of the whole object to prevent loops
   }, [open, classDetails.students]);
 
 
@@ -165,7 +166,7 @@ function ManageStudentsDialog({ classDetails, onStudentsUpdated, children }) {
         </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
           {/* Enrolled Students Column */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 min-h-0">
             <h3 className="font-semibold">
               Enrolled Students ({enrolledStudents.length}/{classDetails.capacity})
             </h3>
@@ -196,7 +197,7 @@ function ManageStudentsDialog({ classDetails, onStudentsUpdated, children }) {
             </div>
           </div>
           {/* Available Students Column */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 min-h-0">
             <h3 className="font-semibold">Available Students</h3>
             <Input
               placeholder="Search available students..."
