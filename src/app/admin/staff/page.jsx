@@ -2,256 +2,228 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "../../../components/auth/auth-provider";
+import { db } from "../../../lib/firebase";
+import { collection, getDocs, doc, deleteDoc, query, where } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
+import { PlusCircle, Trash2, Search } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "../../../components/ui/dialog";
+import { Input } from "../../../components/ui/input";
+import { Label } from "../../../components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/ui/table";
-import { Checkbox } from "../../../components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
-import { Popover, PopoverTrigger, PopoverContent } from "../../../components/ui/popover";
-import { Calendar } from "../../../components/ui/calendar";
-import { Calendar as CalendarIcon, CheckCheck } from "lucide-react";
-import { format } from "date-fns";
 import { useToast } from "../../../hooks/use-toast";
-import { cn } from "../../../lib/utils";
-import { db } from "../../../lib/firebase";
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../../../components/ui/alert-dialog";
+import { createStaffUser } from "../../actions";
 
-export default function AttendancePage() {
-    const { user } = useAuth();
+
+function AddStaffDialog({ onStaffAdded }) {
     const { toast } = useToast();
-    const [staffClasses, setStaffClasses] = useState([]);
-    const [studentsInClass, setStudentsInClass] = useState([]);
-    const [selectedClassId, setSelectedClassId] = useState("");
-    const [selectedDate, setSelectedDate] = useState(new Date());
-    const [attendance, setAttendance] = useState({});
-    const [isLoading, setIsLoading] = useState(false);
+    const [open, setOpen] = useState(false);
+    const [formData, setFormData] = useState({});
 
-    useEffect(() => {
-        const fetchStaffClasses = async () => {
-            if (!user || !user.staff_id) return;
-            setIsLoading(true);
-            try {
-                const q = query(collection(db, "classes"), where("staff", "array-contains", user.staff_id));
-                const querySnapshot = await getDocs(q);
-                const classes = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setStaffClasses(classes);
-            } catch (error) {
-                console.error("Error fetching staff classes: ", error);
-                toast({ variant: "destructive", title: "Error", description: "Could not fetch your classes." });
-            }
-            setIsLoading(false);
-        };
-        fetchStaffClasses();
-    }, [user, toast]);
-
-    const handleClassChange = async (classId) => {
-        setSelectedClassId(classId);
-        setAttendance({});
-        const selectedClass = staffClasses.find(c => c.class_id === classId);
-        if (!selectedClass || !selectedClass.students || selectedClass.students.length === 0) {
-            setStudentsInClass([]);
-            return;
-        }
-
-        setIsLoading(true);
-        try {
-            const studentsQuery = query(collection(db, "users"), where("enrollment_number", "in", selectedClass.students));
-            const studentsSnapshot = await getDocs(studentsQuery);
-            const studentData = studentsSnapshot.docs.map(doc => doc.data());
-            setStudentsInClass(studentData);
-            await loadExistingAttendance(classId, selectedDate);
-        } catch (error) {
-            console.error("Error fetching students: ", error);
-            toast({ variant: "destructive", title: "Error", description: "Could not fetch students for this class." });
-        }
-        setIsLoading(false);
-    };
-    
-    const loadExistingAttendance = async (classId, date) => {
-        const dateKey = format(date, "yyyy-MM-dd");
-        const recordId = `${classId}_${dateKey}`;
-        try {
-            const docRef = doc(db, "attendance", recordId);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                setAttendance(docSnap.data().records || {});
-                toast({ title: "Existing Record Found", description: "Loaded saved attendance for this date." });
-            } else {
-                 setAttendance({});
-            }
-        } catch (error) {
-            console.error("Error fetching attendance: ", error);
-            toast({ variant: "destructive", title: "Error", description: "Could not fetch existing attendance data." });
-        }
-    }
-    
-    useEffect(() => {
-        if(selectedClassId) {
-            loadExistingAttendance(selectedClassId, selectedDate);
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedDate, selectedClassId]);
-
-    const handleCheckboxChange = (studentId) => {
-        setAttendance(prev => ({ ...prev, [studentId]: !prev[studentId] }));
-    };
-
-    const toggleMarkAll = () => {
-        const allCurrentlyPresent = studentsInClass.length > 0 && studentsInClass.every(student => !!attendance[student.enrollment_number]);
-        if(allCurrentlyPresent) {
-            // uncheck all
-            setAttendance({});
-        } else {
-            // check all
-            const allPresent = studentsInClass.reduce((acc, student) => {
-                acc[student.enrollment_number] = true;
-                return acc;
-            }, {});
-            setAttendance(allPresent);
-        }
+    const handleInputChange = (e) => {
+        const { id, value } = e.target;
+        setFormData(prev => ({ ...prev, [id]: value }));
     };
 
     const handleSubmit = async () => {
-        if (!selectedClassId) {
-            toast({ variant: "destructive", title: "Error", description: "Please select a class first." });
+        if (!formData.staffName || !formData.email || !formData.password || !formData.department || !formData.designation) {
+            toast({ variant: "destructive", title: "Missing Fields", description: "Please fill out all required fields." });
             return;
         }
-        const dateKey = format(selectedDate, "yyyy-MM-dd");
-        const recordId = `${selectedClassId}_${dateKey}`;
-        const selectedClass = staffClasses.find(c => c.class_id === selectedClassId);
 
-        // Ensure all students have a boolean entry
-        const finalAttendance = studentsInClass.reduce((acc, student) => {
-            acc[student.enrollment_number] = !!attendance[student.enrollment_number];
-            return acc;
-        }, {});
-        
-        const attendanceRecord = {
-            class_id: selectedClassId,
-            date: dateKey,
-            records: finalAttendance
-        };
+        const result = await createStaffUser(formData);
 
-        try {
-            await setDoc(doc(db, "attendance", recordId), attendanceRecord, { merge: true });
-            toast({
-                title: "Success",
-                description: `Attendance for ${selectedClass.class_name} on ${dateKey} has been submitted.`,
-            });
-        } catch (error) {
-            console.error("Error submitting attendance: ", error);
-            toast({ variant: "destructive", title: "Error", description: "Failed to submit attendance." });
+        if (result.success) {
+            onStaffAdded(result.newUser);
+            toast({ title: "Success", description: result.message });
+            setOpen(false);
+            setFormData({}); // Reset form
+        } else {
+            toast({ variant: "destructive", title: "Error", description: result.message });
         }
     };
 
-    const allMarkedPresent = studentsInClass.length > 0 && studentsInClass.every(student => !!attendance[student.enrollment_number]);
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button>
+                    <PlusCircle className="mr-2" /> Add New Staff
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Add New Staff Member</DialogTitle>
+                    <DialogDescription>
+                        Fill in the details for the new staff member. An authentication account will be created.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="staffName">Full Name</Label>
+                        <Input id="staffName" value={formData.staffName || ''} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input id="email" type="email" value={formData.email || ''} onChange={handleInputChange} />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="password">Password</Label>
+                        <Input id="password" type="password" value={formData.password || ''} onChange={handleInputChange} placeholder="Min. 6 characters" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="department">Department</Label>
+                        <Input id="department" value={formData.department || ''} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="designation">Designation</Label>
+                        <Input id="designation" value={formData.designation || ''} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input id="phone" value={formData.phone || ''} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="joiningDate">Joining Date</Label>
+                        <Input id="joiningDate" type="date" value={formData.joiningDate || ''} onChange={handleInputChange} />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button type="submit" onClick={handleSubmit}>Create Staff Member</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export default function StaffManagementPage() {
+    const { toast } = useToast();
+    const [allStaff, setAllStaff] = useState([]);
+    const [filteredStaff, setFilteredStaff] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState("");
+
+    useEffect(() => {
+        const fetchStaff = async () => {
+            try {
+                const q = query(collection(db, "users"), where("role", "==", "staff"));
+                const querySnapshot = await getDocs(q);
+                const staffData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setAllStaff(staffData);
+                setFilteredStaff(staffData);
+            } catch (error) {
+                console.error("Error fetching staff: ", error);
+                toast({ variant: "destructive", title: "Error", description: "Could not fetch staff from the database." });
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchStaff();
+    }, [toast]);
+
+    useEffect(() => {
+        const lowercasedFilter = searchTerm.toLowerCase();
+        const filtered = allStaff.filter(item => {
+            return (
+                item.name?.toLowerCase().includes(lowercasedFilter) ||
+                item.email?.toLowerCase().includes(lowercasedFilter) ||
+                item.staff_id?.toLowerCase().includes(lowercasedFilter)
+            );
+        });
+        setFilteredStaff(filtered);
+    }, [searchTerm, allStaff]);
+
+    const handleAddStaff = (newStaff) => {
+        setAllStaff([...allStaff, newStaff]);
+    };
+
+    const handleDeleteStaff = async (staffDocId) => {
+        try {
+            await deleteDoc(doc(db, "users", staffDocId));
+            setAllStaff(allStaff.filter(s => s.id !== staffDocId));
+            toast({ title: "Success", description: "Staff member has been deleted." });
+        } catch (error) {
+            console.error("Error deleting staff: ", error);
+            toast({ variant: "destructive", title: "Error", description: "Could not delete staff member." });
+        }
+    };
+
+    if (loading) {
+        return <div className="flex justify-center items-center h-full"><p>Loading staff data...</p></div>
+    }
 
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold">Mark Attendance</h1>
+                <h1 className="text-3xl font-bold">Staff Management</h1>
+                <AddStaffDialog onStaffAdded={handleAddStaff} />
             </div>
-
             <Card>
                 <CardHeader>
-                    <CardTitle>Select Class and Date</CardTitle>
+                    <CardTitle>All Staff Members</CardTitle>
+                    <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search by name, email, or staff ID..."
+                            className="pl-8"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
                 </CardHeader>
-                <CardContent className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1 space-y-2">
-                        <label className="text-sm font-medium">Class</label>
-                        <Select onValueChange={handleClassChange} value={selectedClassId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a class" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {staffClasses.map(c => (
-                                    <SelectItem key={c.class_id} value={c.class_id}>
-                                        {c.class_name} ({c.class_id})
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                     <div className="flex-1 space-y-2">
-                        <label className="text-sm font-medium">Date</label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                        "w-full justify-start text-left font-normal",
-                                        !selectedDate && "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                    mode="single"
-                                    selected={selectedDate}
-                                    onSelect={setSelectedDate}
-                                    initialFocus
-                                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                />
-                            </PopoverContent>
-                        </Popover>
-                    </div>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Staff ID</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Department</TableHead>
+                                <TableHead>Designation</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredStaff.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan="6" className="text-center h-24">
+                                        {searchTerm ? "No staff match your search." : "No staff found."}
+                                    </TableCell>
+                                </TableRow>
+                            ) : filteredStaff.map((staff) => (
+                                <TableRow key={staff.id}>
+                                    <TableCell>{staff.staff_id}</TableCell>
+                                    <TableCell className="font-medium">{staff.name}</TableCell>
+                                    <TableCell>{staff.email}</TableCell>
+                                    <TableCell>{staff.department}</TableCell>
+                                    <TableCell>{staff.designation}</TableCell>
+                                    <TableCell className="text-right">
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="text-destructive">
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        This action cannot be undone. This will permanently delete the staff member's record. Authentication credentials will remain but will not be associated with a staff profile.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteStaff(staff.id)}>Continue</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </CardContent>
             </Card>
-
-            {selectedClassId && (
-                <Card>
-                    <CardHeader>
-                        <div className="flex justify-between items-center">
-                            <CardTitle>
-                                Student List - {staffClasses.find(c=>c.class_id === selectedClassId)?.class_name} ({format(selectedDate, "PPP")})
-                            </CardTitle>
-                            <div className="flex gap-2">
-                                <Button variant="outline" onClick={toggleMarkAll}>
-                                    <CheckCheck className="mr-2" />
-                                    { allMarkedPresent ? 'Unmark All' : 'Mark All Present' }
-                                </Button>
-                                <Button onClick={handleSubmit}>Submit Attendance</Button>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        {isLoading ? <p>Loading students...</p> : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[50px]">Present</TableHead>
-                                        <TableHead>Student Name</TableHead>
-                                        <TableHead>Enrollment No.</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {studentsInClass.length > 0 ? studentsInClass.map(student => (
-                                        <TableRow key={student.enrollment_number}>
-                                            <TableCell>
-                                                <Checkbox
-                                                    checked={!!attendance[student.enrollment_number]}
-                                                    onCheckedChange={() => handleCheckboxChange(student.enrollment_number)}
-                                                    id={`att-${student.enrollment_number}`}
-                                                />
-                                            </TableCell>
-                                            <TableCell className="font-medium">{student.name}</TableCell>
-                                            <TableCell>{student.enrollment_number}</TableCell>
-                                        </TableRow>
-                                    )) : (
-                                        <TableRow>
-                                            <TableCell colSpan="3" className="text-center">No students assigned to this class.</TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
         </div>
     );
 }
