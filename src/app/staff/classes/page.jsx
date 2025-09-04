@@ -6,7 +6,7 @@ import { db } from "../../../lib/firebase";
 import { collection, getDocs, doc, addDoc, query, where, getDoc } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
-import { ArrowLeft, X, FilePlus, CheckSquare, Type, Trash2, FileText, Download } from "lucide-react";
+import { ArrowLeft, X, FilePlus, CheckSquare, Type, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "../../../components/ui/dialog";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
@@ -17,8 +17,6 @@ import { useToast } from "../../../hooks/use-toast";
 import { Textarea } from "../../../components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "../../../components/ui/radio-group";
 import { useAuth } from "../../../components/auth/auth-provider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 
 
 function CreateAssignmentDialog({ classDetails, onAssignmentCreated }) {
@@ -26,8 +24,6 @@ function CreateAssignmentDialog({ classDetails, onAssignmentCreated }) {
     const [open, setOpen] = useState(false);
     const [assignmentName, setAssignmentName] = useState('');
     const [dueDate, setDueDate] = useState('');
-    const [fileType, setFileType] = useState('pdf');
-    const [fileSize, setFileSize] = useState(5);
     const [questions, setQuestions] = useState([{ text: '', type: 'mcq', options: ['', ''], correctAnswerIndex: 0 }]);
 
     const handleQuestionChange = (index, field, value) => {
@@ -77,11 +73,6 @@ function CreateAssignmentDialog({ classDetails, onAssignmentCreated }) {
             classId: classDetails.class_id,
             assignmentName,
             dueDate,
-            fileSubmission: {
-                required: true,
-                allowedType: fileType,
-                maxSizeMB: fileSize
-            },
             questions: questions.map(q => {
                 if (q.type === 'mcq') {
                     return {
@@ -131,35 +122,6 @@ function CreateAssignmentDialog({ classDetails, onAssignmentCreated }) {
                             <div className="space-y-2">
                                 <Label htmlFor="dueDate">Due Date</Label>
                                 <Input id="dueDate" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-                            </div>
-                        </div>
-
-                        <Separator />
-
-                        <div>
-                            <h3 className="text-lg font-semibold mb-2">File Submission Settings</h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="fileType">Allowed File Type</Label>
-                                    <Select onValueChange={setFileType} value={fileType}>
-                                        <SelectTrigger id="fileType">
-                                            <SelectValue placeholder="Select file type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="pdf">PDF</SelectItem>
-                                            <SelectItem value="zip">ZIP</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="fileSize">Max File Size (MB)</Label>
-                                    <Input
-                                    id="fileSize"
-                                    type="number"
-                                    value={fileSize}
-                                    onChange={(e) => setFileSize(parseInt(e.target.value, 10))}
-                                    />
-                                </div>
                             </div>
                         </div>
                         
@@ -227,42 +189,27 @@ function CreateAssignmentDialog({ classDetails, onAssignmentCreated }) {
 function StaffClassDetails({ classDetails, onBack, onAssignmentCreated }) {
     const [allStudents, setAllStudents] = useState([]);
     const [assignments, setAssignments] = useState([]);
-    const [submissions, setSubmissions] = useState([]);
 
     useEffect(() => {
-        const fetchDetails = async () => {
-            // Students
+        const fetchStudents = async () => {
             if (classDetails.students && classDetails.students.length > 0) {
                 const studentQuery = query(collection(db, "users"), where("enrollment_number", "in", classDetails.students));
                 const studentSnapshot = await getDocs(studentQuery);
                 setAllStudents(studentSnapshot.docs.map(doc => doc.data()));
             }
-
-             // Assignments
-            const assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", classDetails.class_id));
-            const assignmentsSnapshot = await getDocs(assignmentsQuery);
-            const assignmentsData = assignmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setAssignments(assignmentsData);
-
-             // Submissions for these assignments
-            if (assignmentsData.length > 0) {
-                const submissionsQuery = query(collection(db, "submissions"), where("assignmentId", "in", assignmentsData.map(a => a.id)));
-                const submissionsSnapshot = await getDocs(submissionsQuery);
-                const submissionsData = submissionsSnapshot.docs.map(doc => doc.data());
-                setSubmissions(submissionsData);
-            }
         }
-        fetchDetails();
-    }, [classDetails]);
-    
-    const getSubmissionsForAssignment = (assignmentId) => {
-        return submissions.filter(s => s.assignmentId === assignmentId);
-    }
+        fetchStudents();
+    }, [classDetails.students]);
 
-    const getStudentName = (studentId) => {
-        const student = allStudents.find(s => s.enrollment_number === studentId);
-        return student ? student.name : studentId;
-    }
+    useEffect(() => {
+        const fetchAssignments = async () => {
+             const assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", classDetails.class_id));
+             const assignmentsSnapshot = await getDocs(assignmentsQuery);
+             setAssignments(assignmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        fetchAssignments();
+    }, [classDetails.class_id])
+
 
     return (
         <Card>
@@ -278,87 +225,52 @@ function StaffClassDetails({ classDetails, onBack, onAssignmentCreated }) {
                 </div>
             </CardHeader>
             <CardContent>
-                <Tabs defaultValue="students" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="students">Students</TabsTrigger>
-                        <TabsTrigger value="assignments">Assignments</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="students" className="mt-4">
-                         <Card>
-                            <CardHeader><CardTitle className="text-base">Enrolled Students</CardTitle></CardHeader>
-                            <CardContent>
-                            {allStudents.length > 0 ? (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Enrollment No.</TableHead>
-                                            <TableHead>Name</TableHead>
-                                            <TableHead>Email</TableHead>
+                <div className="grid md:grid-cols-2 gap-6">
+                    <Card>
+                        <CardHeader><CardTitle className="text-base">Enrolled Students</CardTitle></CardHeader>
+                        <CardContent>
+                        {allStudents.length > 0 ? (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Enrollment No.</TableHead>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Email</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {allStudents.map((student) => (
+                                        <TableRow key={student.enrollment_number}>
+                                            <TableCell>{student.enrollment_number}</TableCell>
+                                            <TableCell className="font-medium">{student.name}</TableCell>
+                                            <TableCell>{student.email}</TableCell>
                                         </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {allStudents.map((student) => (
-                                            <TableRow key={student.enrollment_number}>
-                                                <TableCell>{student.enrollment_number}</TableCell>
-                                                <TableCell className="font-medium">{student.name}</TableCell>
-                                                <TableCell>{student.email}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <p>No students enrolled.</p>
+                        )}
+                        </CardContent>
+                    </Card>
+                     <Card>
+                        <CardHeader><CardTitle className="text-base">Assignments</CardTitle></CardHeader>
+                        <CardContent>
+                            {assignments.length > 0 ? (
+                                <ul>
+                                    {assignments.map(assignment => (
+                                        <li key={assignment.id} className="flex justify-between items-center p-2 border-b">
+                                            <span>{assignment.assignmentName}</span>
+                                            <span className="text-sm text-muted-foreground">Due: {assignment.dueDate}</span>
+                                        </li>
+                                    ))}
+                                </ul>
                             ) : (
-                                <p className="text-muted-foreground text-center py-4">No students have been enrolled in this class yet.</p>
+                                <p>No assignments created for this class.</p>
                             )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                    <TabsContent value="assignments" className="mt-4">
-                        <Card>
-                            <CardHeader><CardTitle className="text-base">Assignments & Submissions</CardTitle></CardHeader>
-                            <CardContent>
-                                {assignments.length > 0 ? (
-                                     <ScrollArea className="h-96">
-                                        {assignments.map(assignment => (
-                                            <div key={assignment.id} className="mb-4 p-2 rounded-lg border">
-                                                <h4 className="font-semibold">{assignment.assignmentName}</h4>
-                                                <p className="text-sm text-muted-foreground mb-2">Due: {assignment.dueDate}</p>
-                                                <Table>
-                                                    <TableHeader>
-                                                        <TableRow>
-                                                            <TableHead>Student</TableHead>
-                                                            <TableHead>Submitted On</TableHead>
-                                                            <TableHead className="text-right">File</TableHead>
-                                                        </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                        {getSubmissionsForAssignment(assignment.id).map(sub => (
-                                                            <TableRow key={sub.studentId}>
-                                                                <TableCell>{getStudentName(sub.studentId)}</TableCell>
-                                                                <TableCell>{sub.submittedAt ? new Date(sub.submittedAt.seconds * 1000).toLocaleString() : 'N/A'}</TableCell>
-                                                                <TableCell className="text-right">
-                                                                     <Button asChild variant="outline" size="sm">
-                                                                        <a href={sub.fileUrl} target="_blank" rel="noopener noreferrer">
-                                                                            <Download className="mr-2"/> Download
-                                                                        </a>
-                                                                    </Button>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                        {getSubmissionsForAssignment(assignment.id).length === 0 && (
-                                                            <TableRow><TableCell colSpan={3} className="text-center">No submissions yet.</TableCell></TableRow>
-                                                        )}
-                                                    </TableBody>
-                                                </Table>
-                                            </div>
-                                        ))}
-                                    </ScrollArea>
-                                ) : (
-                                    <p className="text-muted-foreground text-center py-4">No assignments created for this class.</p>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
+                        </CardContent>
+                    </Card>
+                </div>
             </CardContent>
         </Card>
     );

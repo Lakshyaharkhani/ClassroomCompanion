@@ -28,6 +28,8 @@ export default function LoginPage({ onLogin }) {
     setRole(newRole);
     if (newRole === 'staff') {
       setEmail('staff0@example.com');
+    } else if (newRole === 'admin') {
+      setEmail('admin@example.com');
     } else {
       setEmail('student0@example.com');
     }
@@ -76,7 +78,7 @@ export default function LoginPage({ onLogin }) {
           <div className="space-y-2">
              <Label>Role</Label>
             <div className="flex gap-2">
-              {(["student", "staff"]).map((r) => (
+              {(["student", "staff", "admin"]).map((r) => (
                 <Button
                   key={r}
                   variant={role === r ? "default" : "outline"}
