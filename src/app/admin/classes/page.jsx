@@ -79,10 +79,12 @@ function ManageStudentsDialog({ classDetails, onStudentsUpdated, children }) {
   const [allStudents, setAllStudents] = useState([]);
   const [enrolledStudentIds, setEnrolledStudentIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
       const fetchStudents = async () => {
+        setLoading(true);
         try {
           const studentsQuery = query(
             collection(db, "users"),
@@ -92,7 +94,6 @@ function ManageStudentsDialog({ classDetails, onStudentsUpdated, children }) {
           setAllStudents(
             querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
           );
-          setEnrolledStudentIds(classDetails.students || []);
         } catch (error) {
           console.error("Error fetching students:", error);
           toast({
@@ -100,11 +101,21 @@ function ManageStudentsDialog({ classDetails, onStudentsUpdated, children }) {
             title: "Error",
             description: "Could not fetch student list.",
           });
+        } finally {
+          setLoading(false);
         }
       };
       fetchStudents();
     }
-  }, [open, classDetails.students, toast]);
+  }, [open, toast]);
+
+  // Set enrolled students only when dialog opens or class details change
+  useEffect(() => {
+    if (open) {
+      setEnrolledStudentIds(classDetails.students || []);
+    }
+  }, [open, classDetails.students]);
+
 
   const handleToggleStudent = (studentId) => {
     setEnrolledStudentIds((prev) =>
@@ -148,60 +159,77 @@ function ManageStudentsDialog({ classDetails, onStudentsUpdated, children }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Students for {classDetails.class_name}</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+          {/* Enrolled Students Column */}
+          <div className="flex flex-col gap-2">
             <h3 className="font-semibold">
               Enrolled Students ({enrolledStudents.length}/{classDetails.capacity})
             </h3>
-            <div className="border rounded-md min-h-64">
-              {enrolledStudents.map((student) => (
-                <div
-                  key={student.id}
-                  className="flex items-center justify-between p-2"
-                >
-                  <span>
-                    {student.name} ({student.enrollment_number})
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleToggleStudent(student.enrollment_number)}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ))}
+            <div className="border rounded-md flex-1 min-h-0">
+              <ScrollArea className="h-full">
+                {enrolledStudents.length > 0 ? (
+                  enrolledStudents.map((student) => (
+                    <div
+                      key={student.id}
+                      className="flex items-center justify-between p-2 border-b"
+                    >
+                      <span className="text-sm">
+                        {student.name} ({student.enrollment_number})
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleToggleStudent(student.enrollment_number)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-4 text-center text-sm text-muted-foreground">No students enrolled.</div>
+                )}
+              </ScrollArea>
             </div>
           </div>
-          <div className="space-y-2">
+          {/* Available Students Column */}
+          <div className="flex flex-col gap-2">
             <h3 className="font-semibold">Available Students</h3>
             <Input
-              placeholder="Search students..."
+              placeholder="Search available students..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <div className="border rounded-md min-h-64">
-              {filteredStudents.map((student) => (
-                <div
-                  key={student.id}
-                  className="flex items-center justify-between p-2"
-                >
-                  <span>
-                    {student.name} ({student.enrollment_number})
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleToggleStudent(student.enrollment_number)}
-                  >
-                    Add
-                  </Button>
-                </div>
-              ))}
+            <div className="border rounded-md flex-1 min-h-0">
+              <ScrollArea className="h-full">
+                 {loading ? <p className="p-4 text-center">Loading...</p> : (
+                  filteredStudents.length > 0 ? (
+                    filteredStudents.map((student) => (
+                      <div
+                        key={student.id}
+                        className="flex items-center justify-between p-2 border-b"
+                      >
+                        <span className="text-sm">
+                          {student.name} ({student.enrollment_number})
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleToggleStudent(student.enrollment_number)}
+                          disabled={enrolledStudentIds.length >= classDetails.capacity}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-sm text-muted-foreground">No available students found.</div>
+                  )
+                 )}
+              </ScrollArea>
             </div>
           </div>
         </div>
@@ -403,30 +431,37 @@ function ClassDetailsCard({ classDetails, onBack, onStudentsUpdated }) {
   useEffect(() => {
     const fetchStudentsAndStaff = async () => {
       // Fetch details for enrolled students
-      const studentQuery = query(
-        collection(db, "users"),
-        where("enrollment_number", "in", classDetails.students)
-      );
-      const studentSnapshot = await getDocs(studentQuery);
-      setAllStudents(studentSnapshot.docs.map((doc) => doc.data()));
+      if (classDetails.students && classDetails.students.length > 0) {
+        const studentQuery = query(
+          collection(db, "users"),
+          where("enrollment_number", "in", classDetails.students)
+        );
+        const studentSnapshot = await getDocs(studentQuery);
+        setAllStudents(studentSnapshot.docs.map((doc) => doc.data()));
+      } else {
+        setAllStudents([]);
+      }
 
       // Fetch details for assigned staff
-      const staffQuery = query(
-        collection(db, "users"),
-        where("staff_id", "in", classDetails.staff)
-      );
-      const staffSnapshot = await getDocs(staffQuery);
-      const staffMap = staffSnapshot.docs.reduce((acc, doc) => {
-        const data = doc.data();
-        acc[data.staff_id] = data.name;
-        return acc;
-      }, {});
-      setStaffDetails(staffMap);
+      if (classDetails.staff && classDetails.staff.length > 0) {
+        const staffQuery = query(
+          collection(db, "users"),
+          where("staff_id", "in", classDetails.staff)
+        );
+        const staffSnapshot = await getDocs(staffQuery);
+        const staffMap = staffSnapshot.docs.reduce((acc, doc) => {
+          const data = doc.data();
+          acc[data.staff_id] = data.name;
+          return acc;
+        }, {});
+        setStaffDetails(staffMap);
+      } else {
+        setStaffDetails({});
+      }
     };
+    
+    fetchStudentsAndStaff();
 
-    if (classDetails.students?.length > 0 && classDetails.staff?.length > 0) {
-      fetchStudentsAndStaff();
-    }
   }, [classDetails]);
 
   return (
@@ -462,22 +497,24 @@ function ClassDetailsCard({ classDetails, onBack, onStudentsUpdated }) {
             </CardHeader>
             <CardContent>
               {allStudents.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Enrollment No.</TableHead>
-                      <TableHead>Name</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {allStudents.map((student) => (
-                      <TableRow key={student.enrollment_number}>
-                        <TableCell>{student.enrollment_number}</TableCell>
-                        <TableCell className="font-medium">{student.name}</TableCell>
+                <ScrollArea className="h-72">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Enrollment No.</TableHead>
+                        <TableHead>Name</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {allStudents.map((student) => (
+                        <TableRow key={student.enrollment_number}>
+                          <TableCell>{student.enrollment_number}</TableCell>
+                          <TableCell className="font-medium">{student.name}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
               ) : (
                 <p>No students enrolled.</p>
               )}
@@ -556,6 +593,9 @@ export default function ClassesPage() {
   
   const handleClassUpdated = (updatedClass) => {
     setClasses(classes.map(c => c.id === updatedClass.id ? updatedClass : c));
+     if (selectedClass && selectedClass.id === updatedClass.id) {
+      setSelectedClass(updatedClass);
+    }
   };
 
   const handleStudentsUpdated = (classId, newStudentIds) => {
@@ -566,6 +606,9 @@ export default function ClassesPage() {
       return c;
     });
     setClasses(updatedClasses);
+    if (selectedClass && selectedClass.id === classId) {
+        setSelectedClass(prev => ({...prev, students: newStudentIds}));
+    }
   };
 
   const handleDeleteClass = async (classId) => {
@@ -604,7 +647,7 @@ export default function ClassesPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Class Management</h1>
-        <ClassFormDialog mode="create" onClassCreated={handleClassCreated}>
+        <ClassFormDialog mode="create" onClassCreated={handleClassCreated} onClassUpdated={handleClassUpdated}>
             <Button>
                 <PlusCircle className="mr-2" /> Create Class
             </Button>
