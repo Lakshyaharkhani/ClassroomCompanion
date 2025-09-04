@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { useToast } from "../../../hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../../../components/ui/alert-dialog";
 import { createStaffUser } from "../../actions";
+import { ScrollArea } from "../../../components/ui/scroll-area";
 
 
 function AddStaffDialog({ onStaffAdded }) {
@@ -51,43 +52,57 @@ function AddStaffDialog({ onStaffAdded }) {
                     <PlusCircle className="mr-2" /> Add New Staff
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Add New Staff Member</DialogTitle>
                     <DialogDescription>
                         Fill in the details for the new staff member. An authentication account will be created.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="staffName">Full Name</Label>
-                        <Input id="staffName" value={formData.staffName || ''} onChange={handleInputChange} />
+                <ScrollArea className="max-h-[60vh] pr-6">
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="staffName">Full Name</Label>
+                            <Input id="staffName" value={formData.staffName || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input id="email" type="email" value={formData.email || ''} onChange={handleInputChange} />
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="password">Password</Label>
+                            <Input id="password" type="password" value={formData.password || ''} onChange={handleInputChange} placeholder="Min. 6 characters" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="department">Department</Label>
+                            <Input id="department" value={formData.department || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="designation">Designation</Label>
+                            <Input id="designation" value={formData.designation || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="phone">Phone Number</Label>
+                            <Input id="phone" value={formData.phone || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="joiningDate">Joining Date</Label>
+                            <Input id="joiningDate" type="date" value={formData.joiningDate || ''} onChange={handleInputChange} />
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="qualification">Qualification</Label>
+                            <Input id="qualification" value={formData.qualification || ''} onChange={handleInputChange} />
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="gender">Gender</Label>
+                            <Input id="gender" value={formData.gender || ''} onChange={handleInputChange} />
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="dob">Date of Birth</Label>
+                            <Input id="dob" type="date" value={formData.dob || ''} onChange={handleInputChange} />
+                        </div>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" value={formData.email || ''} onChange={handleInputChange} />
-                    </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
-                        <Input id="password" type="password" value={formData.password || ''} onChange={handleInputChange} placeholder="Min. 6 characters" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="department">Department</Label>
-                        <Input id="department" value={formData.department || ''} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="designation">Designation</Label>
-                        <Input id="designation" value={formData.designation || ''} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <Input id="phone" value={formData.phone || ''} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="joiningDate">Joining Date</Label>
-                        <Input id="joiningDate" type="date" value={formData.joiningDate || ''} onChange={handleInputChange} />
-                    </div>
-                </div>
+                </ScrollArea>
                 <DialogFooter>
                     <Button type="submit" onClick={handleSubmit}>Create Staff Member</Button>
                 </DialogFooter>
@@ -110,6 +125,9 @@ function EditStaffDialog({ staff, onStaffUpdated, children }) {
                 designation: staff.designation,
                 phone: staff.phone,
                 joiningDate: staff.joining_date,
+                qualification: staff.qualification,
+                gender: staff.gender,
+                dob: staff.dob,
             };
             setFormData(initialData);
         }
@@ -130,6 +148,10 @@ function EditStaffDialog({ staff, onStaffUpdated, children }) {
             designation: formData.designation,
             phone: formData.phone,
             joining_date: formData.joiningDate,
+            qualification: formData.qualification,
+            gender: formData.gender,
+            dob: formData.dob,
+            details: { ...staff.details, ...formData },
         };
 
         try {
@@ -146,39 +168,53 @@ function EditStaffDialog({ staff, onStaffUpdated, children }) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>{children}</DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Edit Staff Member</DialogTitle>
                     <DialogDescription>
                         Update the details for {staff.name}. Email cannot be changed.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="staffName">Full Name</Label>
-                        <Input id="staffName" value={formData.staffName || ''} onChange={handleInputChange} />
+                <ScrollArea className="max-h-[60vh] pr-6">
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="staffName">Full Name</Label>
+                            <Input id="staffName" value={formData.staffName || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email (Read-only)</Label>
+                            <Input id="email" type="email" value={formData.email || ''} readOnly disabled />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="department">Department</Label>
+                            <Input id="department" value={formData.department || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="designation">Designation</Label>
+                            <Input id="designation" value={formData.designation || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="phone">Phone Number</Label>
+                            <Input id="phone" value={formData.phone || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="joiningDate">Joining Date</Label>
+                            <Input id="joiningDate" type="date" value={formData.joiningDate || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="qualification">Qualification</Label>
+                            <Input id="qualification" value={formData.qualification || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="gender">Gender</Label>
+                            <Input id="gender" value={formData.gender || ''} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="dob">Date of Birth</Label>
+                            <Input id="dob" type="date" value={formData.dob || ''} onChange={handleInputChange} />
+                        </div>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="email">Email (Read-only)</Label>
-                        <Input id="email" type="email" value={formData.email || ''} readOnly disabled />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="department">Department</Label>
-                        <Input id="department" value={formData.department || ''} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="designation">Designation</Label>
-                        <Input id="designation" value={formData.designation || ''} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <Input id="phone" value={formData.phone || ''} onChange={handleInputChange} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="joiningDate">Joining Date</Label>
-                        <Input id="joiningDate" type="date" value={formData.joiningDate || ''} onChange={handleInputChange} />
-                    </div>
-                </div>
+                </ScrollArea>
                 <DialogFooter>
                     <Button type="submit" onClick={handleSubmit}>Save Changes</Button>
                 </DialogFooter>
