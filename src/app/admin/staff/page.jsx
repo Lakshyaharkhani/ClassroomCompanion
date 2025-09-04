@@ -3,10 +3,10 @@
 
 import { useState, useEffect } from "react";
 import { db } from "../../../lib/firebase";
-import { collection, getDocs, doc, deleteDoc, query, where } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, query, where, setDoc, updateDoc } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
-import { PlusCircle, Trash2, Search } from "lucide-react";
+import { PlusCircle, Trash2, Search, Edit } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "../../../components/ui/dialog";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
@@ -96,6 +96,97 @@ function AddStaffDialog({ onStaffAdded }) {
     );
 }
 
+function EditStaffDialog({ staff, onStaffUpdated, children }) {
+    const { toast } = useToast();
+    const [open, setOpen] = useState(false);
+    const [formData, setFormData] = useState({});
+
+    useEffect(() => {
+        if(open && staff) {
+             const initialData = {
+                staffName: staff.name,
+                email: staff.email, // Email is not editable here but shown for context
+                department: staff.department,
+                designation: staff.designation,
+                phone: staff.phone,
+                joiningDate: staff.joining_date,
+            };
+            setFormData(initialData);
+        }
+    }, [open, staff]);
+
+
+    const handleInputChange = (e) => {
+        const { id, value } = e.target;
+        setFormData(prev => ({ ...prev, [id]: value }));
+    };
+
+    const handleSubmit = async () => {
+        const staffRef = doc(db, "users", staff.id);
+        
+        const updatedData = {
+            name: formData.staffName,
+            department: formData.department,
+            designation: formData.designation,
+            phone: formData.phone,
+            joining_date: formData.joiningDate,
+        };
+
+        try {
+            await updateDoc(staffRef, updatedData);
+            onStaffUpdated({ ...staff, ...updatedData });
+            toast({ title: "Success", description: "Staff member details updated." });
+            setOpen(false);
+        } catch (error) {
+            console.error("Error updating staff: ", error);
+            toast({ variant: "destructive", title: "Error", description: "Could not update staff member." });
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>{children}</DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Edit Staff Member</DialogTitle>
+                    <DialogDescription>
+                        Update the details for {staff.name}. Email cannot be changed.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="staffName">Full Name</Label>
+                        <Input id="staffName" value={formData.staffName || ''} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="email">Email (Read-only)</Label>
+                        <Input id="email" type="email" value={formData.email || ''} readOnly disabled />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="department">Department</Label>
+                        <Input id="department" value={formData.department || ''} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="designation">Designation</Label>
+                        <Input id="designation" value={formData.designation || ''} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input id="phone" value={formData.phone || ''} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="joiningDate">Joining Date</Label>
+                        <Input id="joiningDate" type="date" value={formData.joiningDate || ''} onChange={handleInputChange} />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button type="submit" onClick={handleSubmit}>Save Changes</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export default function StaffManagementPage() {
     const { toast } = useToast();
     const [allStaff, setAllStaff] = useState([]);
@@ -136,6 +227,10 @@ export default function StaffManagementPage() {
     const handleAddStaff = (newStaff) => {
         setAllStaff([...allStaff, newStaff]);
     };
+    
+    const handleUpdateStaff = (updatedStaff) => {
+        setAllStaff(allStaff.map(s => s.id === updatedStaff.id ? updatedStaff : s));
+    }
 
     const handleDeleteStaff = async (staffDocId) => {
         try {
@@ -198,6 +293,11 @@ export default function StaffManagementPage() {
                                     <TableCell>{staff.department}</TableCell>
                                     <TableCell>{staff.designation}</TableCell>
                                     <TableCell className="text-right">
+                                         <EditStaffDialog staff={staff} onStaffUpdated={handleUpdateStaff}>
+                                            <Button variant="ghost" size="icon">
+                                                <Edit className="h-4 w-4" />
+                                            </Button>
+                                        </EditStaffDialog>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                                 <Button variant="ghost" size="icon" className="text-destructive">
